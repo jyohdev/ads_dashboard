@@ -39,4 +39,19 @@ public class MetaAdsController {
                         "details", e.getResponseBody()
                 ));
     }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGeneric(Exception e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        return ResponseEntity.status(500).body(Map.of(
+                "error", "internal_error",
+                "exception", e.getClass().getName(),
+                "message", String.valueOf(e.getMessage()),
+                "rootCause", root.getClass().getName(),
+                "rootMessage", String.valueOf(root.getMessage())
+        ));
+    }
 }

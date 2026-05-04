@@ -1,10 +1,13 @@
 package com.adsdashboard.meta;
 
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -15,8 +18,19 @@ public class MetaAdsClient {
 
     public MetaAdsClient(MetaProperties props) {
         this.props = props;
+        MappingJackson2HttpMessageConverter jackson = new MappingJackson2HttpMessageConverter();
+        jackson.setSupportedMediaTypes(List.of(
+                MediaType.APPLICATION_JSON,
+                MediaType.parseMediaType("text/javascript"),
+                MediaType.parseMediaType("text/plain"),
+                MediaType.parseMediaType("application/*+json")
+        ));
         this.restClient = RestClient.builder()
                 .baseUrl("https://graph.facebook.com/" + props.apiVersion())
+                .messageConverters(converters -> {
+                    converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
+                    converters.add(jackson);
+                })
                 .build();
     }
 
