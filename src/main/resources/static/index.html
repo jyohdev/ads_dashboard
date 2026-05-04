@@ -39,7 +39,7 @@
       </div>
     </section>
 
-    <section class="grid grid-cols-2 md:grid-cols-5 gap-4" id="kpis">
+    <section class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4" id="kpis">
       <div class="bg-white rounded-lg border border-slate-200 p-4">
         <p class="text-xs text-slate-500">총 지출</p>
         <p class="text-2xl font-bold mt-1" id="kpi-spend">—</p>
@@ -52,6 +52,10 @@
         <p class="text-xs text-slate-500">클릭수</p>
         <p class="text-2xl font-bold mt-1" id="kpi-clicks">—</p>
       </div>
+      <div class="bg-white rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <p class="text-xs text-blue-700">문의(전환)</p>
+        <p class="text-2xl font-bold mt-1 text-blue-700" id="kpi-leads">—</p>
+      </div>
       <div class="bg-white rounded-lg border border-slate-200 p-4">
         <p class="text-xs text-slate-500">CTR</p>
         <p class="text-2xl font-bold mt-1" id="kpi-ctr">—</p>
@@ -59,6 +63,10 @@
       <div class="bg-white rounded-lg border border-slate-200 p-4">
         <p class="text-xs text-slate-500">CPC</p>
         <p class="text-2xl font-bold mt-1" id="kpi-cpc">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <p class="text-xs text-blue-700">문의당 비용(CPL)</p>
+        <p class="text-2xl font-bold mt-1 text-blue-700" id="kpi-cpl">—</p>
       </div>
     </section>
 
@@ -87,12 +95,14 @@
               <th class="text-right px-4 py-2 font-medium">노출</th>
               <th class="text-right px-4 py-2 font-medium">클릭</th>
               <th class="text-right px-4 py-2 font-medium">지출</th>
+              <th class="text-right px-4 py-2 font-medium">문의</th>
               <th class="text-right px-4 py-2 font-medium">CTR</th>
               <th class="text-right px-4 py-2 font-medium">CPC</th>
+              <th class="text-right px-4 py-2 font-medium">CPL</th>
             </tr>
           </thead>
           <tbody id="campaignTable">
-            <tr><td colspan="7" class="text-center text-slate-400 py-8">불러오는 중…</td></tr>
+            <tr><td colspan="9" class="text-center text-slate-400 py-8">불러오는 중…</td></tr>
           </tbody>
         </table>
       </div>
@@ -100,6 +110,15 @@
   </main>
 
   <script>
+    // 전환(문의)으로 집계할 action_type 목록.
+    // 본인 광고 설정에 맞게 추가/삭제하세요. 픽셀+인스턴트폼+메신저 모두 커버하려면 여러 개 둠.
+    const LEAD_ACTION_TYPES = [
+      'lead',
+      'offsite_conversion.fb_pixel_lead'
+    ];
+
+    const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5분 (Meta 데이터 갱신 주기 + rate limit 고려)
+
     const state = { datePreset: 'last_7d', campaignsMeta: {}, charts: {} };
 
     const fmt = {
@@ -108,6 +127,13 @@
       pct: n => (Number(n||0)).toFixed(2) + '%',
       cpc: n => '₩' + (Number(n||0)).toFixed(0)
     };
+
+    function sumLeads(actions) {
+      if (!Array.isArray(actions)) return 0;
+      return actions
+          .filter(a => LEAD_ACTION_TYPES.includes(a.action_type))
+          .reduce((s, a) => s + Number(a.value || 0), 0);
+    }
 
     const statusEl = document.getElementById('status');
     const lastUpdatedEl = document.getElementById('lastUpdated');
@@ -127,34 +153,48 @@
 
     function renderKpis(rows) {
       const r = (rows && rows[0]) || {};
-      document.getElementById('kpi-spend').textContent = fmt.money(r.spend);
+      const leads = sumLeads(r.actions);
+      const spend = Number(r.spend || 0);
+      const cpl = leads > 0 ? spend / leads : 0;
+      document.getElementById('kpi-spend').textContent = fmt.money(spend);
       document.getElementById('kpi-impressions').textContent = fmt.int(r.impressions);
       document.getElementById('kpi-clicks').textContent = fmt.int(r.clicks);
+      document.getElementById('kpi-leads').textContent = fmt.int(leads);
       document.getElementById('kpi-ctr').textContent = fmt.pct(r.ctr);
       document.getElementById('kpi-cpc').textContent = fmt.cpc(r.cpc);
+      document.getElementById('kpi-cpl').textContent = leads > 0 ? fmt.money(cpl) : '—';
     }
 
     function renderDailyChart(rows) {
-      const sorted = [...(rows||[])].sort((a,b) => (a.date_start||'').localeCompare(b.date_start||''));
+      const sorted = [...(rows||[])].sort(
+          (a, b) => (a.date_start||'').localeCompare(b.date_start||''));
       const categories = sorted.map(r => r.date_start);
       const spendSeries = sorted.map(r => Math.round(Number(r.spend||0)));
-      const clicksSeries = sorted.map(r => Number(r.clicks||0));
+      const leadsSeries = sorted.map(r => sumLeads(r.actions));
 
       const opts = {
-        chart: { type: 'line', height: 320, toolbar: { show: false }, animations: { enabled: true } },
+        chart: { type: 'line', height: 320, toolbar: { show: false } },
         series: [
           { name: '지출(₩)', type: 'column', data: spendSeries },
-          { name: '클릭', type: 'line', data: clicksSeries }
+          { name: '문의', type: 'line', data: leadsSeries }
         ],
         stroke: { width: [0, 3], curve: 'smooth' },
-        colors: ['#3b82f6', '#10b981'],
+        colors: ['#3b82f6', '#2563eb'],
+        markers: { size: [0, 5] },
         xaxis: { categories, labels: { style: { fontSize: '11px' } } },
         yaxis: [
-          { title: { text: '지출(₩)' }, labels: { formatter: v => fmt.money(v).replace('₩','') } },
-          { opposite: true, title: { text: '클릭' } }
+          { title: { text: '지출(₩)' },
+            labels: { formatter: v => fmt.money(v).replace('₩', '') } },
+          { opposite: true, title: { text: '문의' },
+            labels: { formatter: v => fmt.int(v) } }
         ],
         legend: { position: 'top' },
-        tooltip: { y: { formatter: (val, { seriesIndex }) => seriesIndex === 0 ? fmt.money(val) : fmt.int(val) } }
+        tooltip: {
+          y: {
+            formatter: (val, { seriesIndex }) =>
+                seriesIndex === 0 ? fmt.money(val) : fmt.int(val)
+          }
+        }
       };
 
       if (state.charts.daily) state.charts.daily.destroy();
@@ -192,15 +232,20 @@
         const statusColor = status === 'ACTIVE' ? 'bg-green-100 text-green-700'
                           : status === 'PAUSED' ? 'bg-amber-100 text-amber-700'
                           : 'bg-slate-100 text-slate-600';
+        const leads = sumLeads(r.actions);
+        const spend = Number(r.spend || 0);
+        const cpl = leads > 0 ? spend / leads : null;
         return `
           <tr class="border-t border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2">${escapeHtml(r.campaign_name || '')}</td>
             <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs ${statusColor}">${status}</span></td>
             <td class="px-4 py-2 text-right">${fmt.int(r.impressions)}</td>
             <td class="px-4 py-2 text-right">${fmt.int(r.clicks)}</td>
-            <td class="px-4 py-2 text-right font-medium">${fmt.money(r.spend)}</td>
+            <td class="px-4 py-2 text-right font-medium">${fmt.money(spend)}</td>
+            <td class="px-4 py-2 text-right font-medium text-blue-700">${fmt.int(leads)}</td>
             <td class="px-4 py-2 text-right">${fmt.pct(r.ctr)}</td>
             <td class="px-4 py-2 text-right">${fmt.cpc(r.cpc)}</td>
+            <td class="px-4 py-2 text-right">${cpl !== null ? fmt.money(cpl) : '—'}</td>
           </tr>`;
       }).join('');
     }
@@ -249,7 +294,7 @@
     document.getElementById('refreshBtn').addEventListener('click', loadAll);
 
     loadAll();
-    setInterval(loadAll, 60_000);
+    setInterval(loadAll, POLL_INTERVAL_MS);
   </script>
 </body>
 </html>
