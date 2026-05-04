@@ -135,6 +135,13 @@
           .reduce((s, a) => s + Number(a.value || 0), 0);
     }
 
+    function sumByActionType(actions, type) {
+      if (!Array.isArray(actions)) return 0;
+      return actions
+          .filter(a => a.action_type === type)
+          .reduce((s, a) => s + Number(a.value || 0), 0);
+    }
+
     const statusEl = document.getElementById('status');
     const lastUpdatedEl = document.getElementById('lastUpdated');
 
@@ -170,22 +177,22 @@
           (a, b) => (a.date_start||'').localeCompare(b.date_start||''));
       const categories = sorted.map(r => r.date_start);
       const spendSeries = sorted.map(r => Math.round(Number(r.spend||0)));
-      const leadsSeries = sorted.map(r => sumLeads(r.actions));
+      const linkClickSeries = sorted.map(r => sumByActionType(r.actions, 'link_click'));
 
       const opts = {
         chart: { type: 'line', height: 320, toolbar: { show: false } },
         series: [
           { name: '지출(₩)', type: 'column', data: spendSeries },
-          { name: '문의', type: 'line', data: leadsSeries }
+          { name: '링크클릭', type: 'line', data: linkClickSeries }
         ],
         stroke: { width: [0, 3], curve: 'smooth' },
-        colors: ['#3b82f6', '#2563eb'],
+        colors: ['#3b82f6', '#10b981'],
         markers: { size: [0, 5] },
         xaxis: { categories, labels: { style: { fontSize: '11px' } } },
         yaxis: [
           { title: { text: '지출(₩)' },
             labels: { formatter: v => fmt.money(v).replace('₩', '') } },
-          { opposite: true, title: { text: '문의' },
+          { opposite: true, title: { text: '링크클릭' },
             labels: { formatter: v => fmt.int(v) } }
         ],
         legend: { position: 'top' },
