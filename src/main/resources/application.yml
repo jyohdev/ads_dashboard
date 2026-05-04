@@ -1,0 +1,21 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: ads-dashboard
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+meta:
+  access-token: ${META_ACCESS_TOKEN:}
+  ad-account-id: ${META_AD_ACCOUNT_ID:}
+  api-version: ${META_API_VERSION:v21.0}
