@@ -8,8 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class AdsDashboardApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(AdsDashboardApplication.class, args);
-	}
-
+  public static void main(String[] args) {
+    SpringApplication.run(AdsDashboardApplication.class, args);
+  }
 }

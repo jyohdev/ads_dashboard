@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>광고 대시보드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro KR", "Pretendard", sans-serif; }
+    .chip { transition: all .15s ease; }
+    .chip:hover { background:#1f2937; color:#fff; }
+    .chip.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold">Meta 광고 대시보드</h1>
+        <p class="text-xs text-slate-500" id="status">불러오는 중…</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-500" id="lastUpdated"></span>
+        <button id="refreshBtn" class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700">새로고침</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <section>
+      <div class="flex flex-wrap gap-2" id="dateFilter">
+        <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white" data-preset="today">오늘</button>
+        <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white" data-preset="yesterday">어제</button>
+        <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white active" data-preset="last_7d">최근 7일</button>
+        <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white" data-preset="last_30d">최근 30일</button>
+        <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white" data-preset="this_month">이번 달</button>
+        <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white" data-preset="last_month">지난 달</button>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-4" id="kpis">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <p class="text-xs text-slate-500">총 지출</p>
+        <p class="text-2xl font-bold mt-1" id="kpi-spend">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <p class="text-xs text-slate-500">노출수</p>
+        <p class="text-2xl font-bold mt-1" id="kpi-impressions">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <p class="text-xs text-slate-500">클릭수</p>
+        <p class="text-2xl font-bold mt-1" id="kpi-clicks">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <p class="text-xs text-slate-500">CTR</p>
+        <p class="text-2xl font-bold mt-1" id="kpi-ctr">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <p class="text-xs text-slate-500">CPC</p>
+        <p class="text-2xl font-bold mt-1" id="kpi-cpc">—</p>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <h2 class="text-sm font-semibold mb-3">일별 추이</h2>
+        <div id="dailyChart" style="height:320px"></div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <h2 class="text-sm font-semibold mb-3">캠페인별 지출</h2>
+        <div id="campaignChart" style="height:320px"></div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+        <h2 class="text-sm font-semibold">캠페인 목록</h2>
+        <span class="text-xs text-slate-500" id="campaignCount"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="text-left px-4 py-2 font-medium">캠페인명</th>
+              <th class="text-left px-4 py-2 font-medium">상태</th>
+              <th class="text-right px-4 py-2 font-medium">노출</th>
+              <th class="text-right px-4 py-2 font-medium">클릭</th>
+              <th class="text-right px-4 py-2 font-medium">지출</th>
+              <th class="text-right px-4 py-2 font-medium">CTR</th>
+              <th class="text-right px-4 py-2 font-medium">CPC</th>
+            </tr>
+          </thead>
+          <tbody id="campaignTable">
+            <tr><td colspan="7" class="text-center text-slate-400 py-8">불러오는 중…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = { datePreset: 'last_7d', campaignsMeta: {}, charts: {} };
+
+    const fmt = {
+      money: n => '₩' + Math.round(Number(n||0)).toLocaleString('ko-KR'),
+      int: n => Math.round(Number(n||0)).toLocaleString('ko-KR'),
+      pct: n => (Number(n||0)).toFixed(2) + '%',
+      cpc: n => '₩' + (Number(n||0)).toFixed(0)
+    };
+
+    const statusEl = document.getElementById('status');
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+
+    async function fetchJson(url) {
+      const r = await fetch(url);
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.message || body.details || ('HTTP ' + r.status));
+      return body;
+    }
+
+    function setActiveChip(preset) {
+      document.querySelectorAll('#dateFilter button').forEach(b => {
+        b.classList.toggle('active', b.dataset.preset === preset);
+      });
+    }
+
+    function renderKpis(rows) {
+      const r = (rows && rows[0]) || {};
+      document.getElementById('kpi-spend').textContent = fmt.money(r.spend);
+      document.getElementById('kpi-impressions').textContent = fmt.int(r.impressions);
+      document.getElementById('kpi-clicks').textContent = fmt.int(r.clicks);
+      document.getElementById('kpi-ctr').textContent = fmt.pct(r.ctr);
+      document.getElementById('kpi-cpc').textContent = fmt.cpc(r.cpc);
+    }
+
+    function renderDailyChart(rows) {
+      const sorted = [...(rows||[])].sort((a,b) => (a.date_start||'').localeCompare(b.date_start||''));
+      const categories = sorted.map(r => r.date_start);
+      const spendSeries = sorted.map(r => Math.round(Number(r.spend||0)));
+      const clicksSeries = sorted.map(r => Number(r.clicks||0));
+
+      const opts = {
+        chart: { type: 'line', height: 320, toolbar: { show: false }, animations: { enabled: true } },
+        series: [
+          { name: '지출(₩)', type: 'column', data: spendSeries },
+          { name: '클릭', type: 'line', data: clicksSeries }
+        ],
+        stroke: { width: [0, 3], curve: 'smooth' },
+        colors: ['#3b82f6', '#10b981'],
+        xaxis: { categories, labels: { style: { fontSize: '11px' } } },
+        yaxis: [
+          { title: { text: '지출(₩)' }, labels: { formatter: v => fmt.money(v).replace('₩','') } },
+          { opposite: true, title: { text: '클릭' } }
+        ],
+        legend: { position: 'top' },
+        tooltip: { y: { formatter: (val, { seriesIndex }) => seriesIndex === 0 ? fmt.money(val) : fmt.int(val) } }
+      };
+
+      if (state.charts.daily) state.charts.daily.destroy();
+      state.charts.daily = new ApexCharts(document.getElementById('dailyChart'), opts);
+      state.charts.daily.render();
+    }
+
+    function renderCampaignChart(rows) {
+      const sorted = [...(rows||[])].sort((a,b) => Number(b.spend||0) - Number(a.spend||0)).slice(0, 10);
+      const opts = {
+        chart: { type: 'bar', height: 320, toolbar: { show: false } },
+        series: [{ name: '지출', data: sorted.map(r => Math.round(Number(r.spend||0))) }],
+        plotOptions: { bar: { horizontal: true, borderRadius: 4, dataLabels: { position: 'top' } } },
+        colors: ['#6366f1'],
+        xaxis: { categories: sorted.map(r => (r.campaign_name || '').slice(0, 28)) },
+        dataLabels: { enabled: true, formatter: v => fmt.money(v), style: { fontSize: '10px' }, offsetX: 36 },
+        tooltip: { y: { formatter: v => fmt.money(v) } }
+      };
+      if (state.charts.campaign) state.charts.campaign.destroy();
+      state.charts.campaign = new ApexCharts(document.getElementById('campaignChart'), opts);
+      state.charts.campaign.render();
+    }
+
+    function renderTable(rows) {
+      const sorted = [...(rows||[])].sort((a,b) => Number(b.spend||0) - Number(a.spend||0));
+      const tbody = document.getElementById('campaignTable');
+      document.getElementById('campaignCount').textContent = `${sorted.length}개`;
+      if (!sorted.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-slate-400 py-8">데이터 없음</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = sorted.map(r => {
+        const meta = state.campaignsMeta[r.campaign_id] || {};
+        const status = meta.status || '—';
+        const statusColor = status === 'ACTIVE' ? 'bg-green-100 text-green-700'
+                          : status === 'PAUSED' ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-600';
+        return `
+          <tr class="border-t border-slate-100 hover:bg-slate-50">
+            <td class="px-4 py-2">${escapeHtml(r.campaign_name || '')}</td>
+            <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs ${statusColor}">${status}</span></td>
+            <td class="px-4 py-2 text-right">${fmt.int(r.impressions)}</td>
+            <td class="px-4 py-2 text-right">${fmt.int(r.clicks)}</td>
+            <td class="px-4 py-2 text-right font-medium">${fmt.money(r.spend)}</td>
+            <td class="px-4 py-2 text-right">${fmt.pct(r.ctr)}</td>
+            <td class="px-4 py-2 text-right">${fmt.cpc(r.cpc)}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function loadAll() {
+      statusEl.textContent = '불러오는 중…';
+      statusEl.className = 'text-xs text-slate-500';
+      try {
+        const preset = state.datePreset;
+        const [acct, daily, byCampaign, campaignList] = await Promise.all([
+          fetchJson(`/api/meta/insights?datePreset=${preset}`),
+          fetchJson(`/api/meta/insights/daily?datePreset=${preset}`),
+          fetchJson(`/api/meta/insights/campaigns?datePreset=${preset}`),
+          fetchJson('/api/meta/campaigns')
+        ]);
+
+        state.campaignsMeta = {};
+        (campaignList.data || []).forEach(c => { state.campaignsMeta[c.id] = c; });
+
+        renderKpis(acct.data || []);
+        renderDailyChart(daily.data || []);
+        renderCampaignChart(byCampaign.data || []);
+        renderTable(byCampaign.data || []);
+
+        statusEl.textContent = '연결됨';
+        statusEl.className = 'text-xs text-green-600';
+        lastUpdatedEl.textContent = '최종 업데이트 ' + new Date().toLocaleTimeString('ko-KR');
+      } catch (e) {
+        statusEl.textContent = '에러: ' + e.message;
+        statusEl.className = 'text-xs text-red-600';
+      }
+    }
+
+    document.getElementById('dateFilter').addEventListener('click', e => {
+      const btn = e.target.closest('button[data-preset]');
+      if (!btn) return;
+      state.datePreset = btn.dataset.preset;
+      setActiveChip(state.datePreset);
+      loadAll();
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', loadAll);
+
+    loadAll();
+    setInterval(loadAll, 60_000);
+  </script>
+</body>
+</html>
