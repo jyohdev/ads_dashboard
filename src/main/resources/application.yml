@@ -19,3 +19,12 @@ meta:
   access-token: ${META_ACCESS_TOKEN:}
   ad-account-id: ${META_AD_ACCOUNT_ID:}
   api-version: ${META_API_VERSION:v21.0}
+
+google:
+  developer-token: ${GOOGLE_ADS_DEVELOPER_TOKEN:}
+  client-id: ${GOOGLE_ADS_CLIENT_ID:}
+  client-secret: ${GOOGLE_ADS_CLIENT_SECRET:}
+  refresh-token: ${GOOGLE_ADS_REFRESH_TOKEN:}
+  customer-id: ${GOOGLE_ADS_CUSTOMER_ID:}
+  login-customer-id: ${GOOGLE_ADS_LOGIN_CUSTOMER_ID:}
+  api-version: ${GOOGLE_ADS_API_VERSION:v17}
