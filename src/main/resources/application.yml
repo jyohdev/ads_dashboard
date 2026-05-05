@@ -28,3 +28,35 @@ google:
   customer-id: ${GOOGLE_ADS_CUSTOMER_ID:}
   login-customer-id: ${GOOGLE_ADS_LOGIN_CUSTOMER_ID:}
   api-version: ${GOOGLE_ADS_API_VERSION:v17}
+
+naver:
+  base-url: ${NAVER_ADS_BASE_URL:https://api.searchad.naver.com}
+  accounts:
+    - name: ${NAVER_ADS_0_NAME:}
+      api-key: ${NAVER_ADS_0_API_KEY:}
+      secret-key: ${NAVER_ADS_0_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_0_CUSTOMER_ID:}
+    - name: ${NAVER_ADS_1_NAME:}
+      api-key: ${NAVER_ADS_1_API_KEY:}
+      secret-key: ${NAVER_ADS_1_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_1_CUSTOMER_ID:}
+    - name: ${NAVER_ADS_2_NAME:}
+      api-key: ${NAVER_ADS_2_API_KEY:}
+      secret-key: ${NAVER_ADS_2_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_2_CUSTOMER_ID:}
+    - name: ${NAVER_ADS_3_NAME:}
+      api-key: ${NAVER_ADS_3_API_KEY:}
+      secret-key: ${NAVER_ADS_3_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_3_CUSTOMER_ID:}
+    - name: ${NAVER_ADS_4_NAME:}
+      api-key: ${NAVER_ADS_4_API_KEY:}
+      secret-key: ${NAVER_ADS_4_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_4_CUSTOMER_ID:}
+    - name: ${NAVER_ADS_5_NAME:}
+      api-key: ${NAVER_ADS_5_API_KEY:}
+      secret-key: ${NAVER_ADS_5_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_5_CUSTOMER_ID:}
+    - name: ${NAVER_ADS_6_NAME:}
+      api-key: ${NAVER_ADS_6_API_KEY:}
+      secret-key: ${NAVER_ADS_6_SECRET_KEY:}
+      customer-id: ${NAVER_ADS_6_CUSTOMER_ID:}
