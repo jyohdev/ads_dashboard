@@ -1,8 +1,11 @@
 package com.adsdashboard.naver;
 
 import com.adsdashboard.naver.NaverProperties.NaverAccount;
+import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.crypto.Mac;
@@ -20,10 +23,11 @@ public class NaverAdsClient {
   private static final String HMAC_ALGO = "HmacSHA256";
 
   private final RestClient restClient;
+  private final String baseUrl;
 
   public NaverAdsClient(NaverProperties props) {
+    this.baseUrl = stripTrailingSlash(props.baseUrl());
     this.restClient = RestClient.builder()
-        .baseUrl(props.baseUrl())
         .messageConverters(converters -> {
           converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
           converters.add(jacksonConverter());
@@ -32,34 +36,40 @@ public class NaverAdsClient {
   }
 
   public List<Map<String, Object>> listCampaigns(NaverAccount account) {
-    return getList(account, "/ncc/campaigns", null);
+    return getList(account, "/ncc/campaigns", Map.of());
   }
 
   public List<Map<String, Object>> listAdGroups(NaverAccount account, String campaignId) {
-    return getList(account, "/ncc/adgroups", "nccCampaignId=" + campaignId);
+    return getList(account, "/ncc/adgroups", Map.of("nccCampaignId", campaignId));
   }
 
-  public Map<String, Object> getStats(
+  public Map<String, Object> getStatsByDatePreset(
+      NaverAccount account, List<String> ids, String fieldsJson, String datePreset) {
+    Map<String, String> qp = new LinkedHashMap<>();
+    qp.put("ids", String.join(",", ids));
+    qp.put("fields", fieldsJson);
+    qp.put("datePreset", datePreset);
+    qp.put("timeIncrement", "allDays");
+    return getMap(account, "/stats", qp);
+  }
+
+  public Map<String, Object> getStatsByTimeRange(
       NaverAccount account, List<String> ids, String fieldsJson, String timeRangeJson) {
-    StringBuilder qs = new StringBuilder();
-    qs.append("ids=").append(String.join(",", ids));
-    qs.append("&fields=").append(urlEncode(fieldsJson));
-    qs.append("&timeRange=").append(urlEncode(timeRangeJson));
-    return getMap(account, "/stats", qs.toString());
+    Map<String, String> qp = new LinkedHashMap<>();
+    qp.put("ids", String.join(",", ids));
+    qp.put("fields", fieldsJson);
+    qp.put("timeRange", timeRangeJson);
+    qp.put("timeIncrement", "allDays");
+    return getMap(account, "/stats", qp);
   }
 
   @SuppressWarnings("unchecked")
   private List<Map<String, Object>> getList(
-      NaverAccount account, String path, String queryString) {
+      NaverAccount account, String path, Map<String, String> params) {
+    URI uri = URI.create(baseUrl + path + buildQuery(params));
     try {
       return restClient.get()
-          .uri(uriBuilder -> {
-            uriBuilder.path(path);
-            if (queryString != null && !queryString.isBlank()) {
-              uriBuilder.query(queryString);
-            }
-            return uriBuilder.build();
-          })
+          .uri(uri)
           .headers(headers -> applyAuthHeaders(headers, account, "GET", path))
           .retrieve()
           .body(List.class);
@@ -69,22 +79,35 @@ public class NaverAdsClient {
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> getMap(NaverAccount account, String path, String queryString) {
+  private Map<String, Object> getMap(NaverAccount account, String path, Map<String, String> params) {
+    URI uri = URI.create(baseUrl + path + buildQuery(params));
     try {
       return restClient.get()
-          .uri(uriBuilder -> {
-            uriBuilder.path(path);
-            if (queryString != null && !queryString.isBlank()) {
-              uriBuilder.query(queryString);
-            }
-            return uriBuilder.build();
-          })
+          .uri(uri)
           .headers(headers -> applyAuthHeaders(headers, account, "GET", path))
           .retrieve()
           .body(Map.class);
     } catch (RestClientResponseException e) {
       throw new NaverAdsApiException(e.getStatusCode(), e.getResponseBodyAsString(), e);
     }
+  }
+
+  private static String buildQuery(Map<String, String> params) {
+    if (params == null || params.isEmpty()) return "";
+    StringBuilder sb = new StringBuilder("?");
+    boolean first = true;
+    for (Map.Entry<String, String> e : params.entrySet()) {
+      if (!first) sb.append('&');
+      sb.append(URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8))
+          .append('=')
+          .append(URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8));
+      first = false;
+    }
+    return sb.toString();
+  }
+
+  private static String stripTrailingSlash(String s) {
+    return (s != null && s.endsWith("/")) ? s.substring(0, s.length() - 1) : s;
   }
 
   private static void applyAuthHeaders(
@@ -110,10 +133,6 @@ public class NaverAdsClient {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to sign Naver Ads request", e);
     }
-  }
-
-  private static String urlEncode(String s) {
-    return java.net.URLEncoder.encode(s, StandardCharsets.UTF_8);
   }
 
   private static MappingJackson2HttpMessageConverter jacksonConverter() {

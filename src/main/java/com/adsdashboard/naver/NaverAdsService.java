@@ -2,6 +2,7 @@ package com.adsdashboard.naver;
 
 import com.adsdashboard.naver.NaverProperties.NaverAccount;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,31 +51,27 @@ public class NaverAdsService {
 
   @Cacheable(cacheNames = "naverInsights", key = "'campaign:' + #datePreset")
   public Map<String, Object> getCampaignInsights(String datePreset) {
-    String[] range = toDateRange(datePreset);
-    String timeRangeJson = "{\"since\":\"" + range[0] + "\",\"until\":\"" + range[1] + "\"}";
+    DateSpec spec = resolveDateSpec(datePreset);
     List<NaverAccount> active = props.activeAccounts();
     List<Map<String, Object>> rows = active.parallelStream()
-        .flatMap(acc -> fetchCampaignStats(acc, timeRangeJson).stream())
+        .flatMap(acc -> fetchCampaignStats(acc, spec).stream())
         .collect(Collectors.toList());
     return Map.of(
         "stats", rows,
-        "since", range[0],
-        "until", range[1],
+        "datePreset", spec.label(),
         "configuredAccounts", active.size());
   }
 
   @Cacheable(cacheNames = "naverInsights", key = "'adgroup:' + #datePreset")
   public Map<String, Object> getAdGroupInsights(String datePreset) {
-    String[] range = toDateRange(datePreset);
-    String timeRangeJson = "{\"since\":\"" + range[0] + "\",\"until\":\"" + range[1] + "\"}";
+    DateSpec spec = resolveDateSpec(datePreset);
     List<NaverAccount> active = props.activeAccounts();
     List<Map<String, Object>> rows = active.parallelStream()
-        .flatMap(acc -> fetchAdGroupStats(acc, timeRangeJson).stream())
+        .flatMap(acc -> fetchAdGroupStats(acc, spec).stream())
         .collect(Collectors.toList());
     return Map.of(
         "stats", rows,
-        "since", range[0],
-        "until", range[1],
+        "datePreset", spec.label(),
         "configuredAccounts", active.size());
   }
 
@@ -96,26 +93,34 @@ public class NaverAdsService {
     return all;
   }
 
-  private List<Map<String, Object>> fetchCampaignStats(NaverAccount acc, String timeRangeJson) {
+  private List<Map<String, Object>> fetchCampaignStats(NaverAccount acc, DateSpec spec) {
     List<Map<String, Object>> campaigns = client.listCampaigns(acc);
     List<String> ids = campaigns.stream()
         .map(c -> String.valueOf(c.get("nccCampaignId")))
         .filter(s -> !"null".equals(s))
         .toList();
     if (ids.isEmpty()) return List.of();
-    Map<String, Object> resp = client.getStats(acc, ids, STATS_FIELDS_JSON, timeRangeJson);
+    Map<String, Object> resp = callStats(acc, ids, spec);
     return zipStatsWithMeta(resp, campaigns, "nccCampaignId", "name", "campaignTp");
   }
 
-  private List<Map<String, Object>> fetchAdGroupStats(NaverAccount acc, String timeRangeJson) {
+  private List<Map<String, Object>> fetchAdGroupStats(NaverAccount acc, DateSpec spec) {
     List<Map<String, Object>> adGroups = fetchAccountAdGroups(acc);
     List<String> ids = adGroups.stream()
         .map(g -> String.valueOf(g.get("nccAdgroupId")))
         .filter(s -> !"null".equals(s))
         .toList();
     if (ids.isEmpty()) return List.of();
-    Map<String, Object> resp = client.getStats(acc, ids, STATS_FIELDS_JSON, timeRangeJson);
+    Map<String, Object> resp = callStats(acc, ids, spec);
     return zipStatsWithMeta(resp, adGroups, "nccAdgroupId", "name", "nccCampaignId");
+  }
+
+  private Map<String, Object> callStats(NaverAccount acc, List<String> ids, DateSpec spec) {
+    if (spec.preset() != null) {
+      return client.getStatsByDatePreset(acc, ids, STATS_FIELDS_JSON, spec.preset());
+    }
+    String timeRangeJson = "{\"since\":\"" + spec.since() + "\",\"until\":\"" + spec.until() + "\"}";
+    return client.getStatsByTimeRange(acc, ids, STATS_FIELDS_JSON, timeRangeJson);
   }
 
   @SuppressWarnings("unchecked")
@@ -147,23 +152,31 @@ public class NaverAdsService {
     return out;
   }
 
-  private static String[] toDateRange(String datePreset) {
-    String preset = (datePreset == null || datePreset.isBlank())
-        ? DEFAULT_DATE_PRESET : datePreset.toLowerCase();
+  private record DateSpec(String preset, String since, String until, String label) {}
+
+  // Frontend sends "today/yesterday/last_7d/last_14d/last_30d/this_month/last_month".
+  // Naver native presets: today, yesterday, last7days, last30days, lastweek, lastmonth, lastquarter.
+  // Use Naver preset where matching; fall back to timeRange JSON for unsupported (last_14d, this_month).
+  private static DateSpec resolveDateSpec(String input) {
+    String preset = (input == null || input.isBlank()) ? DEFAULT_DATE_PRESET : input.toLowerCase();
     LocalDate today = LocalDate.now();
     return switch (preset) {
-      case "today" -> new String[] {today.toString(), today.toString()};
-      case "yesterday" -> {
-        String d = today.minusDays(1).toString();
-        yield new String[] {d, d};
-      }
-      case "last_7d", "last_7_days" ->
-          new String[] {today.minusDays(6).toString(), today.toString()};
-      case "last_14d", "last_14_days" ->
-          new String[] {today.minusDays(13).toString(), today.toString()};
-      case "last_30d", "last_30_days" ->
-          new String[] {today.minusDays(29).toString(), today.toString()};
-      default -> new String[] {today.minusDays(6).toString(), today.toString()};
+      case "today" -> new DateSpec("today", null, null, "today");
+      case "yesterday" -> new DateSpec("yesterday", null, null, "yesterday");
+      case "last_7d", "last_7_days" -> new DateSpec("last7days", null, null, "last7days");
+      case "last_30d", "last_30_days" -> new DateSpec("last30days", null, null, "last30days");
+      case "last_month" -> new DateSpec("lastmonth", null, null, "lastmonth");
+      case "last_14d", "last_14_days" -> new DateSpec(
+          null,
+          today.minusDays(13).toString(),
+          today.toString(),
+          "last_14d");
+      case "this_month" -> new DateSpec(
+          null,
+          YearMonth.from(today).atDay(1).toString(),
+          today.toString(),
+          "this_month");
+      default -> new DateSpec("last7days", null, null, "last7days");
     };
   }
 }

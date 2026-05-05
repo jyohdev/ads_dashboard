@@ -11,13 +11,22 @@
     .chip { transition: all .15s ease; }
     .chip:hover { background:#1f2937; color:#fff; }
     .chip.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+
+    /* Naver theme — green */
+    body.theme-naver .chip.active { background:#16a34a; border-color:#16a34a; }
+    body.theme-naver #refreshBtn { background:#16a34a; }
+    body.theme-naver #refreshBtn:hover { background:#15803d; }
+    body.theme-naver .accent-card { background:#f0fdf4; border-color:#bbf7d0; }
+    body.theme-naver .accent-card .accent-label { color:#15803d; }
+    body.theme-naver .accent-card .accent-value { color:#15803d; }
+    body.theme-naver .accent-text { color:#15803d; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <header class="bg-white border-b border-slate-200">
     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-bold">Meta 광고 대시보드</h1>
+        <h1 class="text-xl font-bold" id="title">광고 대시보드</h1>
         <p class="text-xs text-slate-500" id="status">불러오는 중…</p>
       </div>
       <div class="flex items-center gap-2">
@@ -28,6 +37,13 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <section>
+      <div class="flex flex-wrap gap-2" id="platformFilter">
+        <button class="chip px-4 py-2 text-sm rounded-md border border-slate-300 bg-white font-semibold active" data-platform="meta">Meta</button>
+        <button class="chip px-4 py-2 text-sm rounded-md border border-slate-300 bg-white font-semibold" data-platform="naver">네이버</button>
+      </div>
+    </section>
+
     <section>
       <div class="flex flex-wrap gap-2" id="dateFilter">
         <button class="chip px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white" data-preset="today">오늘</button>
@@ -52,9 +68,9 @@
         <p class="text-xs text-slate-500">클릭수</p>
         <p class="text-2xl font-bold mt-1" id="kpi-clicks">—</p>
       </div>
-      <div class="bg-white rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <p class="text-xs text-blue-700">문의(전환)</p>
-        <p class="text-2xl font-bold mt-1 text-blue-700" id="kpi-leads">—</p>
+      <div class="accent-card bg-blue-50 border-blue-200 rounded-lg border p-4">
+        <p class="accent-label text-xs text-blue-700">문의(전환)</p>
+        <p class="accent-value text-2xl font-bold mt-1 text-blue-700" id="kpi-leads">—</p>
       </div>
       <div class="bg-white rounded-lg border border-slate-200 p-4">
         <p class="text-xs text-slate-500">CTR</p>
@@ -64,9 +80,9 @@
         <p class="text-xs text-slate-500">CPC</p>
         <p class="text-2xl font-bold mt-1" id="kpi-cpc">—</p>
       </div>
-      <div class="bg-white rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <p class="text-xs text-blue-700">문의당 비용(CPL)</p>
-        <p class="text-2xl font-bold mt-1 text-blue-700" id="kpi-cpl">—</p>
+      <div class="accent-card bg-blue-50 border-blue-200 rounded-lg border p-4">
+        <p class="accent-label text-xs text-blue-700">문의당 비용(CPL)</p>
+        <p class="accent-value text-2xl font-bold mt-1 text-blue-700" id="kpi-cpl">—</p>
       </div>
     </section>
 
@@ -119,7 +135,14 @@
 
     const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5분 (Meta 데이터 갱신 주기 + rate limit 고려)
 
-    const state = { datePreset: 'last_7d', campaignsMeta: {}, charts: {} };
+    const state = { platform: 'meta', datePreset: 'last_7d', campaignsMeta: {}, charts: {} };
+
+    const PLATFORM_TITLES = { meta: 'Meta 광고 대시보드', naver: '네이버 광고 대시보드' };
+    const PLATFORM_THEMES = {
+      meta:  { primary: '#3b82f6', secondary: '#10b981', bar: '#6366f1' },
+      naver: { primary: '#16a34a', secondary: '#0891b2', bar: '#15803d' }
+    };
+    const theme = () => PLATFORM_THEMES[state.platform] || PLATFORM_THEMES.meta;
 
     const fmt = {
       money: n => '₩' + Math.round(Number(n||0)).toLocaleString('ko-KR'),
@@ -186,7 +209,7 @@
           { name: '링크클릭', type: 'line', data: linkClickSeries }
         ],
         stroke: { width: [0, 3], curve: 'smooth' },
-        colors: ['#3b82f6', '#10b981'],
+        colors: [theme().primary, theme().secondary],
         markers: { size: [0, 5] },
         xaxis: { categories, labels: { style: { fontSize: '11px' } } },
         yaxis: [
@@ -215,7 +238,7 @@
         chart: { type: 'bar', height: 320, toolbar: { show: false } },
         series: [{ name: '지출', data: sorted.map(r => Math.round(Number(r.spend||0))) }],
         plotOptions: { bar: { horizontal: true, borderRadius: 4, dataLabels: { position: 'top' } } },
-        colors: ['#6366f1'],
+        colors: [theme().bar],
         xaxis: { categories: sorted.map(r => (r.campaign_name || '').slice(0, 28)) },
         dataLabels: { enabled: true, formatter: v => fmt.money(v), style: { fontSize: '10px' }, offsetX: 36 },
         tooltip: { y: { formatter: v => fmt.money(v) } }
@@ -249,7 +272,7 @@
             <td class="px-4 py-2 text-right">${fmt.int(r.impressions)}</td>
             <td class="px-4 py-2 text-right">${fmt.int(r.clicks)}</td>
             <td class="px-4 py-2 text-right font-medium">${fmt.money(spend)}</td>
-            <td class="px-4 py-2 text-right font-medium text-blue-700">${fmt.int(leads)}</td>
+            <td class="px-4 py-2 text-right font-medium accent-text text-blue-700">${fmt.int(leads)}</td>
             <td class="px-4 py-2 text-right">${fmt.pct(r.ctr)}</td>
             <td class="px-4 py-2 text-right">${fmt.cpc(r.cpc)}</td>
             <td class="px-4 py-2 text-right">${cpl !== null ? fmt.money(cpl) : '—'}</td>
@@ -261,26 +284,108 @@
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    async function loadMeta() {
+      const preset = state.datePreset;
+      const [acct, daily, byCampaign, campaignList] = await Promise.all([
+        fetchJson(`/api/meta/insights?datePreset=${preset}`),
+        fetchJson(`/api/meta/insights/daily?datePreset=${preset}`),
+        fetchJson(`/api/meta/insights/campaigns?datePreset=${preset}`),
+        fetchJson('/api/meta/campaigns')
+      ]);
+      state.campaignsMeta = {};
+      (campaignList.data || []).forEach(c => { state.campaignsMeta[c.id] = c; });
+      renderKpis(acct.data || []);
+      renderDailyChart(daily.data || []);
+      renderCampaignChart(byCampaign.data || []);
+      renderTable(byCampaign.data || []);
+    }
+
+    // Naver /stats fields → Meta-shape so renderers work
+    function naverRowToMetaShape(row) {
+      return {
+        campaign_id: String(row.id ?? row.nccCampaignId ?? ''),
+        campaign_name: row.name || '',
+        impressions: row.impCnt || 0,
+        clicks: row.clkCnt || 0,
+        spend: row.salesAmt || 0,
+        ctr: row.ctr || 0,
+        cpc: row.cpc || 0,
+        actions: row.ccnt ? [{ action_type: 'lead', value: row.ccnt }] : []
+      };
+    }
+
+    function aggregateRows(rows) {
+      const sum = rows.reduce((acc, r) => {
+        acc.impressions += Number(r.impressions || 0);
+        acc.clicks += Number(r.clicks || 0);
+        acc.spend += Number(r.spend || 0);
+        const leads = sumLeads(r.actions);
+        acc.leads += leads;
+        return acc;
+      }, { impressions: 0, clicks: 0, spend: 0, leads: 0 });
+      const ctr = sum.impressions > 0 ? (sum.clicks / sum.impressions) * 100 : 0;
+      const cpc = sum.clicks > 0 ? sum.spend / sum.clicks : 0;
+      return {
+        impressions: sum.impressions,
+        clicks: sum.clicks,
+        spend: sum.spend,
+        ctr,
+        cpc,
+        actions: [{ action_type: 'lead', value: sum.leads }]
+      };
+    }
+
+    async function loadNaver() {
+      const preset = state.datePreset;
+      const [insights, campaignList] = await Promise.all([
+        fetchJson(`/api/naver/insights/campaigns?datePreset=${preset}`),
+        fetchJson('/api/naver/campaigns')
+      ]);
+      const rows = (insights.stats || []).map(naverRowToMetaShape);
+      state.campaignsMeta = {};
+      (campaignList.campaigns || []).forEach(c => {
+        const id = String(c.nccCampaignId || '');
+        state.campaignsMeta[id] = {
+          id,
+          name: c.name,
+          status: c.status,
+          campaignTp: c.campaignTp
+        };
+      });
+      renderKpis([aggregateRows(rows)]);
+      renderNaverNotice();
+      renderCampaignChart(rows);
+      renderTable(rows);
+    }
+
+    function renderNaverNotice() {
+      const host = document.getElementById('dailyChart');
+      if (state.charts.daily) { state.charts.daily.destroy(); state.charts.daily = null; }
+      host.innerHTML = `
+        <div class="h-full flex items-center justify-center text-center text-slate-400 text-sm">
+          <div>
+            <p class="font-medium text-slate-500">일별 추이</p>
+            <p class="mt-1">네이버 일별 데이터는 비동기 리포트 API 연동 후 제공 예정</p>
+          </div>
+        </div>`;
+    }
+
+    function applyTheme() {
+      document.body.classList.remove('theme-meta', 'theme-naver');
+      document.body.classList.add('theme-' + state.platform);
+    }
+
     async function loadAll() {
       statusEl.textContent = '불러오는 중…';
       statusEl.className = 'text-xs text-slate-500';
+      document.getElementById('title').textContent = PLATFORM_TITLES[state.platform] || '광고 대시보드';
+      applyTheme();
       try {
-        const preset = state.datePreset;
-        const [acct, daily, byCampaign, campaignList] = await Promise.all([
-          fetchJson(`/api/meta/insights?datePreset=${preset}`),
-          fetchJson(`/api/meta/insights/daily?datePreset=${preset}`),
-          fetchJson(`/api/meta/insights/campaigns?datePreset=${preset}`),
-          fetchJson('/api/meta/campaigns')
-        ]);
-
-        state.campaignsMeta = {};
-        (campaignList.data || []).forEach(c => { state.campaignsMeta[c.id] = c; });
-
-        renderKpis(acct.data || []);
-        renderDailyChart(daily.data || []);
-        renderCampaignChart(byCampaign.data || []);
-        renderTable(byCampaign.data || []);
-
+        if (state.platform === 'naver') {
+          await loadNaver();
+        } else {
+          await loadMeta();
+        }
         statusEl.textContent = '연결됨';
         statusEl.className = 'text-xs text-green-600';
         lastUpdatedEl.textContent = '최종 업데이트 ' + new Date().toLocaleTimeString('ko-KR');
@@ -295,6 +400,16 @@
       if (!btn) return;
       state.datePreset = btn.dataset.preset;
       setActiveChip(state.datePreset);
+      loadAll();
+    });
+
+    document.getElementById('platformFilter').addEventListener('click', e => {
+      const btn = e.target.closest('button[data-platform]');
+      if (!btn) return;
+      state.platform = btn.dataset.platform;
+      document.querySelectorAll('#platformFilter button').forEach(b => {
+        b.classList.toggle('active', b.dataset.platform === state.platform);
+      });
       loadAll();
     });
 
