@@ -1,5 +1,6 @@
 package com.adsdashboard.meta;
 
+import java.time.LocalDate;
 import java.util.Map;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -24,18 +25,17 @@ public class MetaAdsService {
 
   @Cacheable(cacheNames = "metaInsights", key = "'account:' + #datePreset")
   public Map<String, Object> getAccountInsights(String datePreset) {
-    return client.getAdAccountInsights(ACCOUNT_FIELDS, normalize(datePreset), null, null);
+    return fetch(ACCOUNT_FIELDS, datePreset, null, null);
   }
 
   @Cacheable(cacheNames = "metaInsights", key = "'daily:' + #datePreset")
   public Map<String, Object> getDailyInsights(String datePreset) {
-    return client.getAdAccountInsights(DAILY_FIELDS, normalize(datePreset), null, "1");
+    return fetch(DAILY_FIELDS, datePreset, null, "1");
   }
 
   @Cacheable(cacheNames = "metaInsights", key = "'campaign:' + #datePreset")
   public Map<String, Object> getCampaignInsights(String datePreset) {
-    return client.getAdAccountInsights(
-        CAMPAIGN_INSIGHT_FIELDS, normalize(datePreset), "campaign", null);
+    return fetch(CAMPAIGN_INSIGHT_FIELDS, datePreset, "campaign", null);
   }
 
   @Cacheable(cacheNames = "metaCampaigns", key = "'list'")
@@ -43,7 +43,30 @@ public class MetaAdsService {
     return client.listCampaigns(CAMPAIGN_LIST_FIELDS);
   }
 
-  private static String normalize(String datePreset) {
-    return (datePreset == null || datePreset.isBlank()) ? DEFAULT_DATE_PRESET : datePreset;
+  private Map<String, Object> fetch(String fields, String datePreset, String level, String timeIncrement) {
+    DateSpec spec = resolveDateSpec(datePreset);
+    if (spec.preset() != null) {
+      return client.getAdAccountInsights(fields, spec.preset(), level, timeIncrement);
+    }
+    return client.getAdAccountInsightsByTimeRange(
+        fields, spec.since(), spec.until(), level, timeIncrement);
+  }
+
+  private record DateSpec(String preset, String since, String until) {}
+
+  // last_7d/last_14d/last_30d 는 "오늘 포함 N일" 의미로 명시적 time_range 사용 (Meta 기본은 오늘 제외).
+  private static DateSpec resolveDateSpec(String input) {
+    String preset = (input == null || input.isBlank()) ? DEFAULT_DATE_PRESET : input;
+    LocalDate today = LocalDate.now();
+    return switch (preset) {
+      case "today" -> new DateSpec("today", null, null);
+      case "yesterday" -> new DateSpec("yesterday", null, null);
+      case "last_7d", "last_7_days" -> new DateSpec(null, today.minusDays(6).toString(), today.toString());
+      case "last_14d", "last_14_days" -> new DateSpec(null, today.minusDays(13).toString(), today.toString());
+      case "last_30d", "last_30_days" -> new DateSpec(null, today.minusDays(29).toString(), today.toString());
+      case "this_month" -> new DateSpec("this_month", null, null);
+      case "last_month" -> new DateSpec("last_month", null, null);
+      default -> new DateSpec(null, today.minusDays(6).toString(), today.toString());
+    };
   }
 }

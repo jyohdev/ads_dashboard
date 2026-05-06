@@ -97,6 +97,97 @@
       </div>
     </section>
 
+    <section id="naverCategorySection" class="space-y-4 hidden">
+      <h2 class="text-sm font-semibold text-slate-700">서비스별 분류 (네이버)</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-emerald-50 rounded-lg border border-emerald-200 p-4">
+          <p class="text-sm font-semibold text-emerald-800">방문요양 (본사+센터 합계)</p>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3 text-sm" id="cat-homecare">
+            <div><span class="text-emerald-700">노출</span> <span class="font-semibold ml-1" data-k="impressions">—</span></div>
+            <div><span class="text-emerald-700">클릭</span> <span class="font-semibold ml-1" data-k="clicks">—</span></div>
+            <div><span class="text-emerald-700">비용</span> <span class="font-semibold ml-1" data-k="spend">—</span></div>
+            <div><span class="text-emerald-700">전환</span> <span class="font-semibold ml-1" data-k="conversions">—</span></div>
+            <div><span class="text-emerald-700">CTR</span> <span class="font-semibold ml-1" data-k="ctr">—</span></div>
+            <div><span class="text-emerald-700">CPC</span> <span class="font-semibold ml-1" data-k="cpc">—</span></div>
+            <div class="col-span-2 md:col-span-3"><span class="text-emerald-700">CPL</span> <span class="font-semibold ml-1" data-k="cpl">—</span></div>
+          </div>
+        </div>
+        <div class="bg-cyan-50 rounded-lg border border-cyan-200 p-4">
+          <p class="text-sm font-semibold text-cyan-800">주간보호 (본사+센터 합계)</p>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3 text-sm" id="cat-daycare">
+            <div><span class="text-cyan-700">노출</span> <span class="font-semibold ml-1" data-k="impressions">—</span></div>
+            <div><span class="text-cyan-700">클릭</span> <span class="font-semibold ml-1" data-k="clicks">—</span></div>
+            <div><span class="text-cyan-700">비용</span> <span class="font-semibold ml-1" data-k="spend">—</span></div>
+            <div><span class="text-cyan-700">전환</span> <span class="font-semibold ml-1" data-k="conversions">—</span></div>
+            <div><span class="text-cyan-700">CTR</span> <span class="font-semibold ml-1" data-k="ctr">—</span></div>
+            <div><span class="text-cyan-700">CPC</span> <span class="font-semibold ml-1" data-k="cpc">—</span></div>
+            <div class="col-span-2 md:col-span-3"><span class="text-cyan-700">CPL</span> <span class="font-semibold ml-1" data-k="cpl">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold mb-3">방문요양 — 센터별</h3>
+          <div id="homecareCenterChart" style="height:280px"></div>
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-xs" id="homecareCenterTable"></table>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold mb-3">주간보호 — 센터별</h3>
+          <div id="daycareCenterChart" style="height:280px"></div>
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-xs" id="daycareCenterTable"></table>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-amber-50 rounded-lg border border-amber-200 p-4">
+        <h3 class="text-sm font-semibold text-amber-800 mb-3">본사 캠페인 (HQ 채널)</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm" id="hq-total">
+          <div><span class="text-amber-700">노출</span> <span class="font-semibold ml-1" data-k="impressions">—</span></div>
+          <div><span class="text-amber-700">클릭</span> <span class="font-semibold ml-1" data-k="clicks">—</span></div>
+          <div><span class="text-amber-700">비용</span> <span class="font-semibold ml-1" data-k="spend">—</span></div>
+          <div><span class="text-amber-700">전환</span> <span class="font-semibold ml-1" data-k="conversions">—</span></div>
+          <div><span class="text-amber-700">CTR</span> <span class="font-semibold ml-1" data-k="ctr">—</span></div>
+          <div><span class="text-amber-700">CPC</span> <span class="font-semibold ml-1" data-k="cpc">—</span></div>
+          <div class="col-span-2 md:col-span-3"><span class="text-amber-700">CPL</span> <span class="font-semibold ml-1" data-k="cpl">—</span></div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+          <div class="bg-white rounded border border-amber-100 p-3">
+            <p class="text-xs font-semibold text-emerald-700">본사·방문요양</p>
+            <div class="grid grid-cols-2 gap-1 mt-2 text-xs" id="hq-svc-homecare">
+              <div><span class="text-slate-500">비용</span> <span class="font-medium ml-1" data-k="spend">—</span></div>
+              <div><span class="text-slate-500">전환</span> <span class="font-medium ml-1" data-k="conversions">—</span></div>
+              <div><span class="text-slate-500">노출</span> <span class="font-medium ml-1" data-k="impressions">—</span></div>
+              <div><span class="text-slate-500">클릭</span> <span class="font-medium ml-1" data-k="clicks">—</span></div>
+            </div>
+          </div>
+          <div class="bg-white rounded border border-amber-100 p-3">
+            <p class="text-xs font-semibold text-cyan-700">본사·주간보호</p>
+            <div class="grid grid-cols-2 gap-1 mt-2 text-xs" id="hq-svc-daycare">
+              <div><span class="text-slate-500">비용</span> <span class="font-medium ml-1" data-k="spend">—</span></div>
+              <div><span class="text-slate-500">전환</span> <span class="font-medium ml-1" data-k="conversions">—</span></div>
+              <div><span class="text-slate-500">노출</span> <span class="font-medium ml-1" data-k="impressions">—</span></div>
+              <div><span class="text-slate-500">클릭</span> <span class="font-medium ml-1" data-k="clicks">—</span></div>
+            </div>
+          </div>
+          <div class="bg-white rounded border border-amber-100 p-3">
+            <p class="text-xs font-semibold text-slate-700">본사·기타 (가족요양·장기요양등급 등)</p>
+            <div class="grid grid-cols-2 gap-1 mt-2 text-xs" id="hq-svc-other">
+              <div><span class="text-slate-500">비용</span> <span class="font-medium ml-1" data-k="spend">—</span></div>
+              <div><span class="text-slate-500">전환</span> <span class="font-medium ml-1" data-k="conversions">—</span></div>
+              <div><span class="text-slate-500">노출</span> <span class="font-medium ml-1" data-k="impressions">—</span></div>
+              <div><span class="text-slate-500">클릭</span> <span class="font-medium ml-1" data-k="clicks">—</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="overflow-x-auto mt-4">
+          <table class="w-full text-xs" id="hqCampaignTable"></table>
+        </div>
+      </div>
+    </section>
+
     <section class="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
         <h2 class="text-sm font-semibold">캠페인 목록</h2>
@@ -126,11 +217,17 @@
   </main>
 
   <script>
-    // 전환(문의)으로 집계할 action_type 목록.
-    // 본인 광고 설정에 맞게 추가/삭제하세요. 픽셀+인스턴트폼+메신저 모두 커버하려면 여러 개 둠.
-    const LEAD_ACTION_TYPES = [
-      'lead',
-      'offsite_conversion.fb_pixel_lead'
+    // 전환(문의) action_type — aggregate-first: `lead`가 있으면 그걸 쓰고,
+    // 없을 때만 서브타입 합산해서 중복 카운트 방지.
+    // ⚠️ `offsite_conversion.custom.<id>` 일반 매칭은 안전하지 않음 — 페이지뷰 등
+    //   다른 Custom Conversion이 같은 패턴으로 들어옴. 정확한 ID 알게 되면 명시.
+    const LEAD_PRIMARY_TYPES = ['lead'];
+    const LEAD_FALLBACK_TYPES = [
+      'offsite_conversion.fb_pixel_lead',
+      'onsite_conversion.lead_grouped',
+      'lead_form_submit',
+      'onsite_web_lead',
+      'offsite_conversion.fb_pixel_custom'
     ];
 
     const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5분 (Meta 데이터 갱신 주기 + rate limit 고려)
@@ -153,8 +250,12 @@
 
     function sumLeads(actions) {
       if (!Array.isArray(actions)) return 0;
+      const primary = actions
+          .filter(a => LEAD_PRIMARY_TYPES.includes(a.action_type))
+          .reduce((s, a) => s + Number(a.value || 0), 0);
+      if (primary > 0) return primary;
       return actions
-          .filter(a => LEAD_ACTION_TYPES.includes(a.action_type))
+          .filter(a => LEAD_FALLBACK_TYPES.includes(a.action_type))
           .reduce((s, a) => s + Number(a.value || 0), 0);
     }
 
@@ -298,6 +399,142 @@
       renderDailyChart(daily.data || []);
       renderCampaignChart(byCampaign.data || []);
       renderTable(byCampaign.data || []);
+      renderCategorySection(null);
+    }
+
+    function fillCategoryCard(elId, t) {
+      const root = document.getElementById(elId);
+      if (!root) return;
+      const v = t || { impressions: 0, clicks: 0, spend: 0, conversions: 0, ctr: 0, cpc: 0, cpl: 0 };
+      const fmts = {
+        impressions: fmt.int, clicks: fmt.int,
+        spend: fmt.money, conversions: fmt.int,
+        ctr: fmt.pct, cpc: fmt.cpc, cpl: fmt.money
+      };
+      root.querySelectorAll('[data-k]').forEach(el => {
+        const k = el.getAttribute('data-k');
+        el.textContent = (fmts[k] || (x => x))(v[k] || 0);
+      });
+    }
+
+    function renderCenterChart(idPrefix, rows) {
+      const host = document.getElementById(idPrefix + 'Chart');
+      if (!host) return;
+      if (state.charts[idPrefix]) { state.charts[idPrefix].destroy(); state.charts[idPrefix] = null; }
+      const sorted = [...rows].sort((a,b) => Number(b.spend||0) - Number(a.spend||0)).slice(0, 12);
+      if (!sorted.length) {
+        host.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400 text-xs">데이터 없음</div>';
+        return;
+      }
+      host.innerHTML = '';
+      const opts = {
+        chart: { type: 'line', height: 280, toolbar: { show: false } },
+        series: [
+          { name: '비용', type: 'column', data: sorted.map(r => Math.round(Number(r.spend||0))) },
+          { name: '전환', type: 'line', data: sorted.map(r => Number(r.conversions||0)) }
+        ],
+        stroke: { width: [0, 3], curve: 'smooth' },
+        colors: ['#16a34a', '#0891b2'],
+        markers: { size: [0, 5] },
+        xaxis: { categories: sorted.map(r => r.center || '미상'), labels: { style: { fontSize: '10px' } } },
+        yaxis: [
+          { title: { text: '비용(₩)' }, labels: { formatter: v => fmt.money(v).replace('₩','') } },
+          { opposite: true, title: { text: '전환' }, labels: { formatter: v => fmt.int(v) } }
+        ],
+        legend: { position: 'top' },
+        tooltip: {
+          y: { formatter: (val, { seriesIndex }) => seriesIndex === 0 ? fmt.money(val) : fmt.int(val) }
+        }
+      };
+      state.charts[idPrefix] = new ApexCharts(host, opts);
+      state.charts[idPrefix].render();
+    }
+
+    function renderCenterTable(tableId, rows) {
+      const t = document.getElementById(tableId);
+      if (!t) return;
+      if (!rows.length) {
+        t.innerHTML = '<tr><td class="text-center text-slate-400 py-3">데이터 없음</td></tr>';
+        return;
+      }
+      const head = `<thead class="text-slate-500 bg-slate-50"><tr>
+        <th class="text-left px-2 py-1">센터</th>
+        <th class="text-right px-2 py-1">노출</th>
+        <th class="text-right px-2 py-1">클릭</th>
+        <th class="text-right px-2 py-1">비용</th>
+        <th class="text-right px-2 py-1">전환</th>
+        <th class="text-right px-2 py-1">CPL</th>
+      </tr></thead>`;
+      const body = rows.map(r => `<tr class="border-t border-slate-100">
+        <td class="px-2 py-1">${escapeHtml(r.center || '미상')}</td>
+        <td class="px-2 py-1 text-right">${fmt.int(r.impressions)}</td>
+        <td class="px-2 py-1 text-right">${fmt.int(r.clicks)}</td>
+        <td class="px-2 py-1 text-right font-medium">${fmt.money(r.spend)}</td>
+        <td class="px-2 py-1 text-right font-medium accent-text">${fmt.int(r.conversions)}</td>
+        <td class="px-2 py-1 text-right">${Number(r.conversions||0) > 0 ? fmt.money(r.cpl) : '—'}</td>
+      </tr>`).join('');
+      t.innerHTML = head + '<tbody>' + body + '</tbody>';
+    }
+
+    function renderCategorySection(data) {
+      const sec = document.getElementById('naverCategorySection');
+      if (!data) { sec.classList.add('hidden'); return; }
+      sec.classList.remove('hidden');
+      const totals = data.totals || {};
+      fillCategoryCard('cat-homecare', totals['방문요양']);
+      fillCategoryCard('cat-daycare', totals['주간보호']);
+      const byCenter = data.byCenter || {};
+      renderCenterChart('homecareCenter', byCenter['방문요양'] || []);
+      renderCenterChart('daycareCenter', byCenter['주간보호'] || []);
+      renderCenterTable('homecareCenterTable', byCenter['방문요양'] || []);
+      renderCenterTable('daycareCenterTable', byCenter['주간보호'] || []);
+      renderHqSection(data.hq || {});
+    }
+
+    function renderHqSection(hq) {
+      fillCategoryCard('hq-total', hq.total);
+      const byService = hq.byService || {};
+      fillCategoryCard('hq-svc-homecare', byService['방문요양']);
+      fillCategoryCard('hq-svc-daycare', byService['주간보호']);
+      fillCategoryCard('hq-svc-other', byService['기타']);
+      renderHqCampaignTable(hq.rows || []);
+    }
+
+    function renderHqCampaignTable(rows) {
+      const t = document.getElementById('hqCampaignTable');
+      if (!t) return;
+      if (!rows.length) {
+        t.innerHTML = '<tr><td class="text-center text-slate-400 py-3">본사 캠페인 없음</td></tr>';
+        return;
+      }
+      const sorted = [...rows].sort((a,b) => Number(b.salesAmt||0) - Number(a.salesAmt||0));
+      const head = `<thead class="text-slate-500 bg-slate-50"><tr>
+        <th class="text-left px-2 py-1">캠페인</th>
+        <th class="text-left px-2 py-1">서비스</th>
+        <th class="text-right px-2 py-1">노출</th>
+        <th class="text-right px-2 py-1">클릭</th>
+        <th class="text-right px-2 py-1">비용</th>
+        <th class="text-right px-2 py-1">전환</th>
+        <th class="text-right px-2 py-1">CPL</th>
+      </tr></thead>`;
+      const body = sorted.map(r => {
+        const spend = Number(r.salesAmt || 0);
+        const conv = Number(r.ccnt || 0);
+        const cpl = conv > 0 ? spend / conv : null;
+        const svcColor = r.service === '방문요양' ? 'text-emerald-700'
+                       : r.service === '주간보호' ? 'text-cyan-700'
+                       : 'text-slate-500';
+        return `<tr class="border-t border-slate-100">
+          <td class="px-2 py-1">${escapeHtml(r.name || '')}</td>
+          <td class="px-2 py-1 ${svcColor} font-medium">${escapeHtml(r.service || '')}</td>
+          <td class="px-2 py-1 text-right">${fmt.int(r.impCnt)}</td>
+          <td class="px-2 py-1 text-right">${fmt.int(r.clkCnt)}</td>
+          <td class="px-2 py-1 text-right font-medium">${fmt.money(spend)}</td>
+          <td class="px-2 py-1 text-right font-medium">${fmt.int(conv)}</td>
+          <td class="px-2 py-1 text-right">${cpl !== null ? fmt.money(cpl) : '—'}</td>
+        </tr>`;
+      }).join('');
+      t.innerHTML = head + '<tbody>' + body + '</tbody>';
     }
 
     // Naver /stats fields → Meta-shape so renderers work
@@ -337,9 +574,10 @@
 
     async function loadNaver() {
       const preset = state.datePreset;
-      const [insights, campaignList] = await Promise.all([
+      const [insights, campaignList, byCategory] = await Promise.all([
         fetchJson(`/api/naver/insights/campaigns?datePreset=${preset}`),
-        fetchJson('/api/naver/campaigns')
+        fetchJson('/api/naver/campaigns'),
+        fetchJson(`/api/naver/insights/by-category?datePreset=${preset}`)
       ]);
       const rows = (insights.stats || []).map(naverRowToMetaShape);
       state.campaignsMeta = {};
@@ -356,6 +594,7 @@
       renderNaverNotice();
       renderCampaignChart(rows);
       renderTable(rows);
+      renderCategorySection(byCategory);
     }
 
     function renderNaverNotice() {

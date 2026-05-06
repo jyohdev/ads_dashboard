@@ -1,5 +1,8 @@
 package com.adsdashboard.meta;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatusCode;
@@ -47,6 +50,34 @@ public class MetaAdsClient {
       }
       return b.build();
     });
+  }
+
+  public Map<String, Object> getAdAccountInsightsByTimeRange(
+      String fields, String since, String until, String level, String timeIncrement) {
+    // time_range JSON 의 {} 가 Spring URI template 으로 오인되지 않도록 URI 직접 빌드.
+    String path = "/act_" + props.adAccountId() + "/insights";
+    String timeRangeJson = "{\"since\":\"" + since + "\",\"until\":\"" + until + "\"}";
+    StringBuilder qs = new StringBuilder();
+    qs.append("?fields=").append(enc(fields));
+    qs.append("&time_range=").append(enc(timeRangeJson));
+    qs.append("&limit=").append(DEFAULT_PAGE_LIMIT);
+    qs.append("&access_token=").append(enc(props.accessToken()));
+    if (level != null && !level.isBlank()) qs.append("&level=").append(enc(level));
+    if (timeIncrement != null && !timeIncrement.isBlank()) {
+      qs.append("&time_increment=").append(enc(timeIncrement));
+    }
+    URI uri = URI.create(GRAPH_BASE_URL + props.apiVersion() + path + qs);
+    try {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> body = restClient.get().uri(uri).retrieve().body(Map.class);
+      return body;
+    } catch (RestClientResponseException e) {
+      throw new MetaApiException(e.getStatusCode(), e.getResponseBodyAsString(), e);
+    }
+  }
+
+  private static String enc(String v) {
+    return URLEncoder.encode(v, StandardCharsets.UTF_8);
   }
 
   public Map<String, Object> listCampaigns(String fields) {

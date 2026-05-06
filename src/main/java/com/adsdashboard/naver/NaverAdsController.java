@@ -42,6 +42,12 @@ public class NaverAdsController {
     return service.getAdGroupInsights(datePreset);
   }
 
+  @GetMapping("/insights/by-category")
+  public Map<String, Object> insightsByCategory(
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
+    return service.getInsightsByCategory(datePreset);
+  }
+
   @ExceptionHandler(NaverAdsClient.NaverAdsApiException.class)
   public ResponseEntity<Map<String, Object>> handleNaverError(
       NaverAdsClient.NaverAdsApiException e) {
