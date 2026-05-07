@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>케어링 광고 대시보드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.min.js"></script>
+  <style>
+    :root {
+      --caring-primary: #EF6079;       /* 케어링 브랜드 핑크 */
+      --caring-primary-strong: #D94560; /* hover/active 강조 */
+      --caring-primary-soft: #FCE3E8;   /* 카드 배경 */
+      --caring-primary-tint: #FFF1F4;
+      --caring-secondary: #5BA8A0;
+      --bg: #F7F4F4;
+      --sidebar-w: 220px;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif; background: var(--bg); color:#1F1F1F; }
+    .tab-btn { transition: all .15s; background:#F1F1F1; color:#525252; border:none; }
+    .tab-btn:hover { background:#E5E5E5; }
+    .tab-btn.active { background: var(--caring-primary); color:#fff; }
+    /* 매체별 active 색상 */
+    #platformTabs button[data-platform="naver"].active { background: #16A34A; }
+    #platformTabs button[data-platform="google"].active { background: #0EA5E9; }
+    #platformTabs button[data-platform="meta"].active { background: #1E3A8A; }
+    #platformTabs button[data-platform="all"].active { background: var(--caring-primary); }
+    .pill { border-radius: 9999px; padding: .45rem 1.1rem; font-size: 0.875rem; font-weight: 600; }
+    .card { background:#fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.05); }
+    .card-hover:hover { box-shadow: 0 4px 12px rgba(15,23,42,0.08); transform: translateY(-1px); transition: all .18s; }
+    .card-soft { background: var(--caring-primary-tint); border-radius: 16px; }
+    .placeholder { background: repeating-linear-gradient(45deg,#fafafa,#fafafa 6px,#f4f4f4 6px,#f4f4f4 12px); }
+    .accent-text { color: var(--caring-primary); }
+    .accent-bg { background: var(--caring-primary); color:#fff; }
+    .filter-input { border:1px solid #E5E5E5; border-radius: 9px; padding: .4rem .8rem; font-size: 0.875rem; background:#fff; }
+    .filter-input:focus { outline:none; border-color: var(--caring-primary); }
+    .section-title { font-size: 0.95rem; font-weight: 700; color:#1F1F1F; }
+    .section-sub { font-size: 0.75rem; color:#9CA3AF; }
+    .mini-stat { font-size: 0.7rem; color:#6B7280; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background:#D1D5DB; border-radius: 4px; }
+    /* anchor scroll — sticky topbar 높이만큼 보정 */
+    html { scroll-behavior: smooth; }
+    section[id^="section-"] { scroll-margin-top: 100px; }
+    /* Layout */
+    .layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+    .sidebar { background:#fff; border-right: 1px solid #EFEAE7; padding: 1.25rem 0.75rem; position: sticky; top:0; height: 100vh; overflow-y:auto; }
+    .nav-item { display:flex; align-items:center; gap:.65rem; padding:.6rem .85rem; border-radius:10px; font-size:.875rem; color:#3F3F3F; cursor:pointer; }
+    .nav-item:hover { background:#F7F4F2; }
+    .nav-item.active { background: var(--caring-primary-soft); color: var(--caring-primary-strong); font-weight:600; }
+    .nav-icon { width:18px; height:18px; flex-shrink:0; }
+    .topbar { background:#fff; border-bottom:1px solid #EFEAE7; padding:1rem 1.5rem; display:flex; align-items:center; gap:1rem; }
+    .hero-pill { background: var(--caring-primary-soft); color: var(--caring-primary-strong); padding: .55rem 1rem; border-radius: 12px; font-weight: 700; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <div class="flex items-center gap-2 px-2 mb-6">
+      <div class="w-8 h-8 rounded-full" style="background:linear-gradient(135deg,#EF6079,#F8A1B4)"></div>
+      <div>
+        <p class="font-bold text-sm">케어링 광고</p>
+        <p class="text-[10px] text-slate-400">Marketing Dashboard</p>
+      </div>
+    </div>
+    <nav class="space-y-1">
+      <a class="nav-item active" href="#section-kpi">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>핵심지표</span>
+      </a>
+      <a class="nav-item" href="#section-service">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9h-9V3z" fill="currentColor" opacity=".25"/></svg>
+        <span>서비스별</span>
+      </a>
+      <a class="nav-item" href="#section-hq">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>
+        <span>본부별</span>
+      </a>
+      <a class="nav-item" href="#section-trend">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 8-8"/></svg>
+        <span>추이 분석</span>
+      </a>
+      <a class="nav-item" href="#section-platform">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16M16 4v16"/></svg>
+        <span>매체별 상세</span>
+      </a>
+    </nav>
+    <div class="mt-8 pt-4 border-t border-slate-100">
+      <p class="px-2 text-[11px] text-slate-400 mb-2">데이터 소스</p>
+      <div class="px-2 space-y-1.5 text-xs text-slate-500">
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Naver Ads · 7개</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Meta Ads</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> Google · 미연동</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> 신규콜 시트</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right side: topbar + main -->
+  <div class="flex flex-col">
+
+    <header class="topbar sticky top-0 z-10">
+      <div class="flex-1">
+        <h1 class="font-bold text-lg leading-tight">광고 현황판</h1>
+        <p class="text-xs text-slate-400">Real-time · Meta · Naver</p>
+      </div>
+      <div class="hero-pill text-base">
+        <span class="text-xs opacity-80 mr-2">총 지출</span>
+        <span id="hero-spend">—</span>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <select id="hqFilter" class="filter-input">
+          <option value="all">전체 본부</option>
+          <option>본사</option>
+          <option>수도권1본부</option>
+          <option>수도권2본부</option>
+          <option>수도권3본부</option>
+          <option>영남본부</option>
+          <option>충청본부</option>
+          <option>호남본부</option>
+        </select>
+        <select id="centerFilter" class="filter-input">
+          <option value="all">전체 센터</option>
+        </select>
+        <button id="resetFilters" title="필터 초기화" class="text-slate-400 hover:text-[var(--caring-primary)] text-sm px-1">↻</button>
+        <span class="text-slate-200">|</span>
+        <select id="dateFilter" class="filter-input">
+          <option value="today">오늘</option>
+          <option value="yesterday">어제</option>
+          <option value="last_7d" selected>최근 7일</option>
+          <option value="last_14d">최근 14일</option>
+          <option value="last_30d">최근 30일</option>
+          <option value="this_month">이번 달</option>
+          <option value="last_month">지난 달</option>
+          <option value="custom">사용자 지정</option>
+        </select>
+        <div id="customDateRange" class="hidden items-center gap-1">
+          <input id="dateSince" type="date" class="filter-input" />
+          <span class="text-slate-300 text-xs">~</span>
+          <input id="dateUntil" type="date" class="filter-input" />
+        </div>
+        <span class="text-xs text-slate-400 ml-2" id="lastUpdated">—</span>
+      </div>
+    </header>
+
+<main class="px-6 py-6 space-y-6">
+
+  <!-- Section 0: 서비스 탭 (최상단 필터) -->
+  <section>
+    <div class="flex items-center gap-2 flex-wrap" id="serviceTabs">
+      <button class="svc-tab tab-btn pill active" data-svc="all">전체</button>
+      <button class="svc-tab tab-btn pill" data-svc="본사">본사</button>
+      <button class="svc-tab tab-btn pill" data-svc="방문요양">방문요양</button>
+      <button class="svc-tab tab-btn pill" data-svc="주간보호">주간보호</button>
+      <button class="svc-tab tab-btn pill" data-svc="가족요양">가족요양</button>
+      <button class="svc-tab tab-btn pill" data-svc="요양보호사">요양보호사</button>
+      <button class="svc-tab tab-btn pill" data-svc="장기요양등급">장기요양등급</button>
+    </div>
+  </section>
+
+  <!-- Section 1: 핵심지표 -->
+  <section id="section-kpi">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="section-title">핵심지표</h2>
+      <span class="section-sub" id="kpi-period-label">최근 7일</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div class="card p-5">
+        <p class="text-xs text-slate-500">총 지출</p>
+        <p class="text-xl font-bold mt-2 accent-text" id="kpi-spend">—</p>
+        <p class="text-[10px] text-slate-400 mt-1">Meta · Naver 합계</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs text-slate-500">노출</p>
+        <p class="text-xl font-bold mt-2" id="kpi-impressions">—</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs text-slate-500">클릭</p>
+        <p class="text-xl font-bold mt-2" id="kpi-clicks">—</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs text-slate-500">전화 클릭</p>
+        <p class="text-xl font-bold mt-2 accent-text" id="kpi-conversions">—</p>
+      </div>
+      <div class="card p-5 placeholder">
+        <p class="text-xs text-slate-500">신규콜</p>
+        <p class="text-xl font-bold mt-2" id="kpi-newcomers">—</p>
+        <p class="text-[10px] text-slate-400 mt-1">시트 연동 대기</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1.5: 서비스별 카드 -->
+  <section id="section-service">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="section-title">서비스별 보기</h2>
+      <span class="section-sub">캠페인명 기반 분류</span>
+    </div>
+    <div id="serviceCards" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"></div>
+  </section>
+
+  <!-- Section 2: 본부별 카드 -->
+  <section id="section-hq">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="section-title">본부별 보기</h2>
+      <span class="section-sub">카드 클릭 → 산하 센터·캠페인 펼침</span>
+    </div>
+    <div id="hqCards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3"></div>
+    <div id="hqDrilldown" class="mt-4 hidden card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="section-title" id="hqDrilldownTitle">—</h3>
+        <button id="hqDrilldownClose" class="text-xs text-slate-500 hover:accent-text px-2 py-1">닫기</button>
+      </div>
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm" id="hqCenterTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: 추이 분석 -->
+  <section id="section-trend">
+    <h2 class="section-title mb-3">추이 분석</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-5">
+        <h3 class="text-sm font-semibold mb-3">전사 일별 지출/전환 추이</h3>
+        <div id="trendOverall" style="height:300px"></div>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-sm font-semibold mb-3">본부별 종합 <span class="text-xs text-slate-400 font-normal">지출 · 전화클릭 · 신규콜</span></h3>
+        <div id="trendByHq" style="height:300px"></div>
+        <p class="text-xs text-slate-400 mt-2">막대=전화클릭·신규콜(좌축), 선=지출(우축). 신규콜은 시트 연동 후 채워짐.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: 매체별 -->
+  <section id="section-platform">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="section-title">매체별 상세</h2>
+      <span class="section-sub">매체종합 · Naver · Google · Meta</span>
+    </div>
+    <div class="flex gap-2 mb-3 text-sm flex-wrap" id="platformTabs">
+      <button class="tab-btn pill active" data-platform="all">매체종합</button>
+      <button class="tab-btn pill" data-platform="naver">Naver</button>
+      <button class="tab-btn pill" data-platform="google">Google <span class="text-[10px] opacity-60 ml-1">scaffold</span></button>
+      <button class="tab-btn pill" data-platform="meta">Meta</button>
+    </div>
+
+    <div class="card p-5">
+      <div id="platformSummary" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5 pb-5 border-b border-slate-100">
+        <div><p class="mini-stat">지출</p><p class="text-lg font-bold mt-0.5" id="ps-spend">—</p></div>
+        <div><p class="mini-stat">노출</p><p class="text-lg font-bold mt-0.5" id="ps-imps">—</p></div>
+        <div><p class="mini-stat">클릭</p><p class="text-lg font-bold mt-0.5" id="ps-clicks">—</p></div>
+        <div><p class="mini-stat accent-text">전화 클릭</p><p class="text-lg font-bold mt-0.5 accent-text" id="ps-phone">—</p></div>
+        <div class="placeholder rounded-lg px-1"><p class="mini-stat">신규콜</p><p class="text-lg font-bold mt-0.5" id="ps-newcomers">—</p></div>
+        <div><p class="mini-stat accent-text">전화클릭당 비용</p><p class="text-lg font-bold mt-0.5 accent-text" id="ps-cpl-phone">—</p></div>
+        <div class="placeholder rounded-lg px-1"><p class="mini-stat">신규콜당 비용</p><p class="text-lg font-bold mt-0.5" id="ps-cpl-newcomer">—</p></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+          <h4 class="text-xs font-semibold text-slate-600 mb-2">캠페인 분포 (지출 기준)</h4>
+          <div id="platformCampaignChart" style="height:280px"></div>
+        </div>
+        <div>
+          <h4 class="text-xs font-semibold text-slate-600 mb-2">캠페인 목록</h4>
+          <div class="overflow-x-auto max-h-72 overflow-y-auto scrollbar-thin">
+            <table class="w-full text-xs" id="platformCampaignTable"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 광고 대시보드 · 데이터는 Meta · Naver API 실시간 · 본부 매핑·신규콜은 시트 연동 대기</p>
+</main>
+
+  </div>
+</div>
+
+<script>
+  // ──────────────────── 본부 → 센터 매핑 (스크린샷 기준 공식 명) ────────────────────
+  // TODO: 실제 매핑 시트 연동되면 서버에서 받기. 현재는 wireframe 용 하드코딩.
+  const HQ_LIST = ['본사','수도권1본부','수도권2본부','수도권3본부','영남본부','충청본부','호남본부'];
+  const HQ_CENTERS = {
+    '본사': [],
+    '수도권1본부': ['광명점','수원권선점','용인기흥점','의왕점'],
+    '수도권2본부': ['(신)강남점','강동점','부천점','성남점','성북점','수원점','안산점','영등포점','용인처인점','인천점','화성점','(구)강남점'],
+    '수도권3본부': ['가온센터(간호)','관악점','서울도봉점','서울서초점','서울양천점','서울은평점','안양점','(구)고은센터','(구)다솜센터','(구)라온센터'],
+    '영남본부': ['경주점','김해점','대구서구정점(병설)','부산금정점','부산기장점','부산동래점','부산사하점(병설)','부산수영점','부산연제점','부산점','부산진구점','양산점(병설)','영남센터','창원마산점','창원점','창원진해점'],
+    '충청본부': ['대전둔산점(병설)','대전서구점','대전점','천안점','청주점'],
+    '호남본부': ['광주남구점','광주동구점','광주봄날점(병설)','광주북구점','광주서구점','군산점(병설)','김제점','여수점','호남센터'],
+  };
+  const ALL_CENTERS = HQ_LIST.flatMap(h => HQ_CENTERS[h]);
+
+  // 추출명 → 공식 센터명 정규화 (필터 매칭용).
+  // 광고 데이터의 센터명과 본부 매핑의 공식 명이 다를 때 같은 센터로 인식시킴.
+  const CENTER_NORMALIZE = {
+    '강남센터': '(신)강남점',
+    '서초센터': '서울서초점',
+    '안양시': '안양점',
+    '은평구': '서울은평점',
+    '도봉구': '서울도봉점',
+    '양천구': '서울양천점',
+    '가온센터': '가온센터(간호)',
+    '고은센터': '(구)고은센터',
+    '다솜센터': '(구)다솜센터',
+    '라온센터': '(구)라온센터',
+    '서울성북점': '성북점',
+    '서울영등포점': '영등포점',
+    '봄날점': '광주봄날점(병설)',
+    '광주봄날점': '광주봄날점(병설)',
+    '대전둔산점': '대전둔산점(병설)',
+    '사하점': '부산사하점(병설)',
+    '부산사하점': '부산사하점(병설)',
+    '양산점': '양산점(병설)',
+    '군산점': '군산점(병설)',
+  };
+  function normalizeCenterName(name) {
+    if (!name) return name;
+    return CENTER_NORMALIZE[name] || name;
+  }
+
+  // Naver/Meta API에서 추출된 센터명 → 본부 alias.
+  // 네이밍이 공식 명과 달라 직접 매핑 안 되는 케이스(병설 suffix, 행정구 표기, 약어 등) 보정.
+  const CENTER_ALIAS = {
+    // 수도권2본부 (서울 prefix / 강남센터 → 강남점)
+    '강남센터': '수도권2본부',
+    '서울성북점': '수도권2본부',
+    '서울영등포점': '수도권2본부',
+    '처인점': '수도권2본부',
+    // 수도권3본부 (서초센터, 행정구 표기, (구) 시리즈, ~점 alias)
+    '서초센터': '수도권3본부',
+    '안양시': '수도권3본부',
+    '은평구': '수도권3본부',
+    '도봉구': '수도권3본부',
+    '양천구': '수도권3본부',
+    '가온센터': '수도권3본부',
+    '고은센터': '수도권3본부',
+    '다솜센터': '수도권3본부',
+    '라온센터': '수도권3본부',
+    '가온점': '수도권3본부',
+    '고은점': '수도권3본부',
+    '다솜점': '수도권3본부',
+    '라온점': '수도권3본부',
+    // 영남본부 (병설 suffix 누락, 통합/umbrella, 본부 자체 키워드)
+    '양산점': '영남본부',
+    '사하점': '영남본부',
+    '부산사하점': '영남본부',
+    '부산통합': '영남본부',
+    '창원통합': '영남본부',
+    '영남본부': '영남본부',
+    // 충청본부
+    '대전둔산점': '충청본부',
+    // 호남본부
+    '군산점': '호남본부',
+    '봄날점': '호남본부',
+    '광주봄날점': '호남본부',
+    '광주공통': '호남본부',
+    '호남광주첨단점': '호남본부',
+    '호남본부': '호남본부',
+  };
+
+  // 매체별 컬러 (Naver=초록, Meta=진한파랑, Google=하늘색)
+  const PLATFORM_COLOR = {
+    naver:  { primary: '#16A34A', soft: '#DCFCE7', text: '#166534' },
+    meta:   { primary: '#1E3A8A', soft: '#DBEAFE', text: '#1E3A8A' },
+    google: { primary: '#0EA5E9', soft: '#E0F2FE', text: '#0369A1' },
+    all:    { primary: '#EF6079', soft: '#FCE3E8', text: '#D94560' }
+  };
+
+  const fmt = {
+    money: n => '₩' + Math.round(Number(n||0)).toLocaleString('ko-KR'),
+    int: n => Math.round(Number(n||0)).toLocaleString('ko-KR'),
+    pct: n => (Number(n||0)).toFixed(2) + '%',
+    cpc: n => '₩' + (Number(n||0)).toFixed(0),
+    short: n => { n = Number(n||0); if (n >= 1e8) return (n/1e8).toFixed(1)+'억'; if (n >= 1e4) return (n/1e4).toFixed(1)+'만'; return Math.round(n).toLocaleString(); }
+  };
+
+  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null };
+
+  function buildDateQuery() {
+    if (state.datePreset === 'custom' && state.since && state.until) {
+      return `datePreset=custom&since=${state.since}&until=${state.until}`;
+    }
+    return `datePreset=${state.datePreset}`;
+  }
+
+  async function fetchJson(u){ const r = await fetch(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+
+  function centerToHq(centerName) {
+    if (!centerName) return null;
+    // 1) 공식 명 직접 매칭
+    for (const hq of HQ_LIST) {
+      if ((HQ_CENTERS[hq]||[]).includes(centerName)) return hq;
+    }
+    // 2) alias (광고 API 추출명 → 본부)
+    return CENTER_ALIAS[centerName] || null;
+  }
+
+  // 캠페인명 파싱. 우선순위: 방문요양 → 주간보호 → 가족요양 → 요양보호사 → 본사 → 기타
+  // (서비스 키워드가 본사 키워드를 이김 — 본사 캠페인 안의 #02/#03/#04/#05 분류와 일치)
+  function classifyByName(name) {
+    if (!name) return { service:'기타', channel:'미분류', center:null };
+    let svc = null;
+    // 1) 강한 키워드
+    if (/방문요양|방요/.test(name)) svc = '방문요양';
+    else if (/주간보호|주보/.test(name)) svc = '주간보호';
+    else if (/가족요양/.test(name)) svc = '가족요양';
+    else if (/요양보호사|요보사/.test(name)) svc = '요양보호사';
+    else if (/장기요양등급/.test(name)) svc = '장기요양등급';
+    // 2) 브랜드검색 → 본사
+    else if (/브랜드검색/.test(name)) svc = '본사';
+    // 3) 플레이스 등 키워드 없는 캠페인은 #02/#03/#04/#05 prefix 로 추론
+    else if (/#02(?!\d)/.test(name)) svc = '방문요양';
+    else if (/#03(?!\d)/.test(name)) svc = '주간보호';
+    else if (/#04(?!\d)/.test(name)) svc = '가족요양';
+    else if (/#05(?!\d)/.test(name)) svc = '요양보호사';
+    // 4) 본사 키워드 fallback
+    else if (/본사/.test(name)) svc = '본사';
+    else svc = '기타';
+
+    const isHQ = /본사/.test(name);
+    if (svc === '본사' || svc === '가족요양' || svc === '요양보호사' || svc === '장기요양등급' || svc === '기타') {
+      // HQ 또는 센터 없는 서비스 — channel 은 본사 keyword 유무로
+      return { service:svc, channel: isHQ ? '본사' : (svc==='기타' ? '미분류' : '본사'), center:null };
+    }
+    // 방문요양/주간보호 — 우선순위 기반 센터 추출 (강한 패턴부터)
+    const center = pickStrongCenter(name);
+    return { service:svc, channel: isHQ ? '본사' : '센터', center };
+  }
+
+  // ~점 → ~센터 → ~본부 → ~통합 → ~공통 우선순위. 단순 suffix 단독 토큰("본부","센터" 등)은 제외.
+  function pickStrongCenter(name) {
+    if (!name) return null;
+    const tokens = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    const exclude = new Set(['본부','센터','통합','공통','점','본사']);
+    const checks = ['점','센터','본부','통합','공통'];
+    for (const suffix of checks) {
+      for (let i = tokens.length - 1; i >= 0; i--) {
+        const t = tokens[i];
+        if (t.endsWith(suffix) && t.length > suffix.length && !exclude.has(t)) return t;
+      }
+    }
+    return null;
+  }
+
+  const SERVICE_LIST = ['본사','방문요양','주간보호','가족요양','요양보호사','장기요양등급'];
+
+  // 통합 캠페인 리스트 (Naver + Meta), 분류 메타 포함, 현재 필터(본부/센터) 적용 후 반환
+  function getFilteredCampaigns() {
+    const all = [];
+    (state.naverData?.rows||[]).forEach(r => {
+      const cls = classifyByName(r.name);
+      const hq = cls.channel === '본사' ? '본사' : (centerToHq(cls.center) || null);
+      all.push({
+        platform:'Naver', name:r.name, service:cls.service, channel:cls.channel, center:cls.center,
+        hq, spend: Number(r.salesAmt||0), conversions: Number(r.ccnt||0),
+        clicks: Number(r.clkCnt||0), impressions: Number(r.impCnt||0)
+      });
+    });
+    (state.metaCampaigns?.data||[]).forEach(c => {
+      const cls = classifyByName(c.campaign_name);
+      const hq = cls.channel === '본사' ? '본사' : (centerToHq(cls.center) || null);
+      const conv = (c.actions||[]).filter(a=>a.action_type==='offsite_conversion.fb_pixel_custom').reduce((s,a)=>s+Number(a.value||0),0);
+      all.push({
+        platform:'Meta', name:c.campaign_name, service:cls.service, channel:cls.channel, center:cls.center,
+        hq, spend: Number(c.spend||0), conversions: conv,
+        clicks: Number(c.clicks||0), impressions: Number(c.impressions||0)
+      });
+    });
+    return all.filter(c => {
+      if (state.service !== 'all') {
+        // 본사 탭은 channel=본사 기준 — 캠페인명에 "본사" 들어간 모든 캠페인
+        // (방문요양·주간보호·가족요양·요양보호사·장기요양등급 본사 캠페인 다 포함)
+        if (state.service === '본사') {
+          if (c.channel !== '본사') return false;
+        } else {
+          if (c.service !== state.service) return false;
+        }
+      }
+      if (state.hq !== 'all' && c.hq !== state.hq) return false;
+      if (state.center !== 'all') {
+        const raw = c.center;
+        const norm = normalizeCenterName(raw);
+        if (raw !== state.center && norm !== state.center) return false;
+      }
+      return true;
+    });
+  }
+
+  function aggregateByService() {
+    const buckets = {};
+    SERVICE_LIST.forEach(s => buckets[s] = { spend:0, conversions:0, clicks:0, impressions:0, count:0 });
+    getFilteredCampaigns().forEach(c => {
+      // 본사 버킷: channel=본사 모든 캠페인 (서비스 분류 무관)
+      if (c.channel === '본사' && buckets['본사']) {
+        const b = buckets['본사'];
+        b.spend += c.spend; b.conversions += c.conversions; b.clicks += c.clicks; b.impressions += c.impressions; b.count += 1;
+      }
+      // 서비스 버킷: 자신의 service 로 합산 (본사·방문요양 캠페인은 본사·방문요양 양쪽 모두 카운트)
+      if (c.service !== '본사' && buckets[c.service]) {
+        const b = buckets[c.service];
+        b.spend += c.spend; b.conversions += c.conversions; b.clicks += c.clicks; b.impressions += c.impressions; b.count += 1;
+      }
+    });
+    return buckets;
+  }
+
+  // ──────────────────── 데이터 로딩 ────────────────────
+  async function loadAll() {
+    const dp = state.datePreset;
+    const presetLabels = {today:'오늘',yesterday:'어제',last_7d:'최근 7일',last_14d:'최근 14일',last_30d:'최근 30일',this_month:'이번 달',last_month:'지난 달'};
+    const label = dp === 'custom' && state.since && state.until ? `${state.since} ~ ${state.until}` : (presetLabels[dp] || dp);
+    document.getElementById('kpi-period-label').textContent = label;
+    const q = buildDateQuery();
+    try {
+      const [naver, meta, metaCamps] = await Promise.all([
+        fetchJson(`/api/naver/insights/by-category?${q}`),
+        fetchJson(`/api/meta/insights?${q}`),
+        fetchJson(`/api/meta/insights/campaigns?${q}`)
+      ]);
+      state.naverData = naver;
+      state.metaData = meta;
+      state.metaCampaigns = metaCamps;
+      renderKpiStrip();
+      renderServiceCards();
+      renderHqCards();
+      renderTrendOverall();
+      renderTrendByHq();
+      renderPlatform();
+      document.getElementById('lastUpdated').textContent = '최종 ' + new Date().toLocaleTimeString('ko-KR');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ──────────────────── 핵심지표 ────────────────────
+  function renderKpiStrip() {
+    const cs = getFilteredCampaigns();
+    const sum = cs.reduce((a,c) => {
+      a.spend += c.spend; a.imps += c.impressions; a.clicks += c.clicks; a.conv += c.conversions;
+      return a;
+    }, { spend:0, imps:0, clicks:0, conv:0 });
+    document.getElementById('kpi-spend').textContent = fmt.money(sum.spend);
+    document.getElementById('kpi-impressions').textContent = fmt.int(sum.imps);
+    document.getElementById('kpi-clicks').textContent = fmt.int(sum.clicks);
+    document.getElementById('kpi-conversions').textContent = fmt.int(sum.conv);
+    document.getElementById('kpi-newcomers').textContent = '—';
+    const hero = document.getElementById('hero-spend');
+    if (hero) hero.textContent = fmt.money(sum.spend);
+  }
+
+  // 사이드바 nav active 상태 + 스크롤 위치 따라 자동 하이라이트
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+    });
+  });
+  const navIo = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const id = e.target.id;
+        document.querySelectorAll('.nav-item').forEach(n => {
+          n.classList.toggle('active', n.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  document.querySelectorAll('section[id^="section-"]').forEach(s => navIo.observe(s));
+
+  // ──────────────────── 서비스별 카드 ────────────────────
+  function renderServiceCards() {
+    const buckets = aggregateByService();
+    const dot = {
+      '본사': '#EF6079',
+      '방문요양': '#5BA8A0',
+      '주간보호': '#67A6E0',
+      '가족요양': '#E5A85B',
+      '요양보호사': '#9B7AC4',
+      '장기요양등급': '#7B8794',
+    };
+    const root = document.getElementById('serviceCards');
+    root.innerHTML = SERVICE_LIST.map(s => {
+      const b = buckets[s];
+      return `
+      <div class="card card-hover p-5 cursor-pointer" data-svc="${s}">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${dot[s]}"></span>
+          <p class="text-sm font-semibold text-slate-700">${s}</p>
+        </div>
+        <p class="text-2xl font-bold mt-2">${fmt.short(b.spend)}<span class="text-xs text-slate-400 ml-0.5">원</span></p>
+        <div class="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-1 text-xs">
+          <div><span class="text-slate-500">전화클릭</span> <span class="font-semibold ml-1 text-slate-800">${fmt.int(b.conversions)}</span></div>
+          <div><span class="text-slate-500">캠페인</span> <span class="font-semibold ml-1 text-slate-800">${b.count}</span></div>
+          <div><span class="text-slate-500">노출</span> <span class="font-semibold ml-1 text-slate-800">${fmt.short(b.impressions)}</span></div>
+          <div><span class="text-slate-500">클릭</span> <span class="font-semibold ml-1 text-slate-800">${fmt.int(b.clicks)}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+    // 클릭 → 서비스 탭으로 필터 적용
+    root.querySelectorAll('[data-svc]').forEach(el => el.addEventListener('click', () => {
+      state.service = el.dataset.svc;
+      document.querySelectorAll('#serviceTabs button').forEach(b => b.classList.toggle('active', b.dataset.svc === state.service));
+      rerenderAll();
+    }));
+  }
+
+  // ──────────────────── 본부별 카드 ────────────────────
+  function aggregateByHq() {
+    const buckets = {};
+    HQ_LIST.forEach(h => buckets[h] = { spend:0, conversions:0, clicks:0, impressions:0, centers:{}, campaigns:[] });
+    getFilteredCampaigns().forEach(c => {
+      if (!c.hq || !buckets[c.hq]) return;
+      const b = buckets[c.hq];
+      b.spend += c.spend; b.conversions += c.conversions; b.clicks += c.clicks; b.impressions += c.impressions;
+      const key = c.center || (c.channel === '본사' ? '(본사)' : '미분류');
+      b.centers[key] = b.centers[key] || { center:key, service:c.service, spend:0, conversions:0, clicks:0, impressions:0, count:0 };
+      b.centers[key].spend += c.spend;
+      b.centers[key].conversions += c.conversions;
+      b.centers[key].clicks += c.clicks;
+      b.centers[key].impressions += c.impressions;
+      b.centers[key].count += 1;
+      b.campaigns.push({ platform:c.platform, name:c.name, service:c.service, center:key, spend:c.spend, conversions:c.conversions, clicks:c.clicks, impressions:c.impressions });
+    });
+    return buckets;
+  }
+
+  function renderHqCards() {
+    const buckets = aggregateByHq();
+    const root = document.getElementById('hqCards');
+    const maxSpend = Math.max(1, ...HQ_LIST.map(h => buckets[h].spend || 0));
+    root.innerHTML = HQ_LIST.map(hq => {
+      const b = buckets[hq];
+      const centerCount = Object.keys(b.centers).length;
+      const subtitle = hq === '본사' ? '본사 캠페인' : `센터 ${centerCount}개`;
+      const pct = Math.max(2, Math.round((b.spend / maxSpend) * 100));
+      return `
+        <button data-hq="${hq}" class="hq-card card card-hover text-left p-4">
+          <p class="text-xs font-semibold text-slate-700">${hq}</p>
+          <p class="text-xl font-bold mt-1">${fmt.short(b.spend)}<span class="text-xs text-slate-400 ml-0.5">원</span></p>
+          <div class="h-1 bg-slate-100 rounded-full mt-2 overflow-hidden">
+            <div class="h-full rounded-full" style="width:${pct}%;background:var(--caring-primary)"></div>
+          </div>
+          <div class="flex items-center justify-between mt-2">
+            <span class="text-xs text-slate-500">전화 ${b.conversions}</span>
+            <span class="text-xs text-slate-400">${subtitle}</span>
+          </div>
+        </button>`;
+    }).join('');
+    root.querySelectorAll('.hq-card').forEach(el => el.addEventListener('click', () => showHqDrilldown(el.dataset.hq, buckets)));
+  }
+
+  function showHqDrilldown(hq, buckets) {
+    const b = buckets[hq];
+    const drill = document.getElementById('hqDrilldown');
+    document.getElementById('hqDrilldownTitle').textContent = `${hq} — 센터·캠페인 매핑`;
+    drill.classList.remove('hidden');
+    const tbl = document.getElementById('hqCenterTable');
+    const camps = (b.campaigns || []).slice().sort((a,b) => {
+      const k1 = (a.center||'').localeCompare(b.center||'');
+      return k1 !== 0 ? k1 : (b.spend - a.spend);
+    });
+    if (!camps.length) {
+      const filterStatus = [];
+      if (state.service !== 'all') filterStatus.push(`서비스: <span class="font-semibold">${state.service}</span>`);
+      if (state.hq !== 'all') filterStatus.push(`본부: <span class="font-semibold">${state.hq}</span>`);
+      if (state.center !== 'all') filterStatus.push(`센터: <span class="font-semibold">${state.center}</span>`);
+      const hint = filterStatus.length
+        ? `<div class="mt-2 text-xs text-slate-400">현재 필터 — ${filterStatus.join(' · ')}</div>
+           <button onclick="document.querySelectorAll('#serviceTabs button[data-svc=\\'all\\']')[0]?.click(); document.getElementById('hqFilter').value='all'; document.getElementById('centerFilter').value='all'; state.service='all'; state.hq='all'; state.center='all'; document.querySelectorAll('#serviceTabs button').forEach(b => b.classList.toggle('active', b.dataset.svc==='all')); rerenderAll();" class="mt-3 px-3 py-1 text-xs rounded-full" style="background:var(--caring-primary-soft);color:var(--caring-primary-strong)">필터 모두 해제</button>`
+        : '';
+      tbl.innerHTML = `<tr><td class="text-center text-slate-400 py-6">
+        <div class="text-sm">매핑된 캠페인 없음</div>
+        ${hint}
+      </td></tr>`;
+      return;
+    }
+    // Group by center
+    const byCenter = {};
+    camps.forEach(c => { (byCenter[c.center] = byCenter[c.center] || []).push(c); });
+    const orderedCenters = Object.keys(byCenter).sort((a,b) => {
+      const sa = byCenter[a].reduce((s,c)=>s+c.spend,0);
+      const sb = byCenter[b].reduce((s,c)=>s+c.spend,0);
+      return sb - sa;
+    });
+    let html = `
+      <thead class="bg-slate-50 text-slate-500 text-xs">
+        <tr>
+          <th class="text-left px-3 py-2">센터</th>
+          <th class="text-left px-3 py-2">매체</th>
+          <th class="text-left px-3 py-2">서비스</th>
+          <th class="text-left px-3 py-2">캠페인명</th>
+          <th class="text-right px-3 py-2">노출</th>
+          <th class="text-right px-3 py-2">클릭</th>
+          <th class="text-right px-3 py-2">지출</th>
+          <th class="text-right px-3 py-2">전화클릭</th>
+        </tr>
+      </thead><tbody>`;
+    orderedCenters.forEach(centerName => {
+      const cs = byCenter[centerName].sort((a,b) => b.spend - a.spend);
+      const sumSpend = cs.reduce((s,c)=>s+c.spend,0);
+      const sumConv = cs.reduce((s,c)=>s+c.conversions,0);
+      const sumClk = cs.reduce((s,c)=>s+c.clicks,0);
+      const sumImp = cs.reduce((s,c)=>s+c.impressions,0);
+      // Center summary row
+      html += `<tr class="bg-slate-50 border-t border-slate-200">
+        <td class="px-3 py-2 font-semibold" colspan="3">${centerName} <span class="text-xs text-slate-400">(${cs.length}개 캠페인)</span></td>
+        <td class="px-3 py-2 text-xs text-slate-400">합계</td>
+        <td class="px-3 py-2 text-right text-xs">${fmt.int(sumImp)}</td>
+        <td class="px-3 py-2 text-right text-xs">${fmt.int(sumClk)}</td>
+        <td class="px-3 py-2 text-right text-xs font-semibold">${fmt.money(sumSpend)}</td>
+        <td class="px-3 py-2 text-right text-xs font-semibold text-blue-700">${fmt.int(sumConv)}</td>
+      </tr>`;
+      cs.forEach(c => {
+        html += `<tr class="border-t border-slate-100">
+          <td class="px-3 py-2 text-slate-300">└</td>
+          <td class="px-3 py-2">${platformBadge(c.platform)}</td>
+          <td class="px-3 py-2 text-xs">${c.service}</td>
+          <td class="px-3 py-2 text-xs">${c.name||''}</td>
+          <td class="px-3 py-2 text-right text-xs">${fmt.int(c.impressions)}</td>
+          <td class="px-3 py-2 text-right text-xs">${fmt.int(c.clicks)}</td>
+          <td class="px-3 py-2 text-right text-xs">${fmt.money(c.spend)}</td>
+          <td class="px-3 py-2 text-right text-xs accent-text">${fmt.int(c.conversions)}</td>
+        </tr>`;
+      });
+    });
+    html += `</tbody>`;
+    tbl.innerHTML = html;
+  }
+
+  document.getElementById('hqDrilldownClose').addEventListener('click', () => {
+    document.getElementById('hqDrilldown').classList.add('hidden');
+  });
+
+  // ──────────────────── 추이 차트 ────────────────────
+  function renderTrendOverall() {
+    // Meta 일별만 사용 — Naver 일별은 비동기 리포트 필요 (미연동)
+    const host = document.getElementById('trendOverall');
+    if (state.charts.overall) state.charts.overall.destroy();
+    host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-400 text-center">
+      <div>일별 추이 — Meta 일별만 가능 (Naver 비동기 리포트 미연동)<br/>실제 구현 시 두 매체 통합</div></div>`;
+  }
+
+  function renderTrendByHq() {
+    const host = document.getElementById('trendByHq');
+    if (state.charts.byHq) state.charts.byHq.destroy();
+    const buckets = aggregateByHq();
+    // 신규콜 — 시트 미연동, placeholder 0
+    const newCallsByHq = HQ_LIST.map(_ => 0);
+    const opts = {
+      chart: { type: 'line', height: 300, toolbar: { show: false }, stacked: false },
+      series: [
+        { name: '전화클릭', type: 'column', data: HQ_LIST.map(h => buckets[h].conversions||0) },
+        { name: '신규콜', type: 'column', data: newCallsByHq },
+        { name: '지출(₩)', type: 'line', data: HQ_LIST.map(h => Math.round(buckets[h].spend||0)) }
+      ],
+      stroke: { width: [0, 0, 3], curve: 'smooth' },
+      markers: { size: [0, 0, 5] },
+      xaxis: { categories: HQ_LIST, labels: { style: { fontSize: '10px' } } },
+      yaxis: [
+        { seriesName: '전화클릭', title: { text: '전화클릭/신규콜' }, labels: { formatter: v => fmt.int(v) } },
+        { seriesName: '전화클릭', show: false },
+        { seriesName: '지출(₩)', opposite: true, title: { text: '지출(₩)' }, labels: { formatter: v => fmt.short(v) } }
+      ],
+      plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
+      colors: ['#EF6079', '#F8A1B4', '#5BA8A0'],
+      legend: { position: 'top', horizontalAlign: 'left', fontSize: '12px' },
+      tooltip: {
+        y: {
+          formatter: (v, { seriesIndex }) => seriesIndex === 2 ? fmt.money(v) : fmt.int(v)
+        }
+      }
+    };
+    state.charts.byHq = new ApexCharts(host, opts);
+    state.charts.byHq.render();
+  }
+
+  // ──────────────────── 매체별 ────────────────────
+  function renderPlatform() {
+    const p = state.platform;
+    let spend=0, imps=0, clicks=0, conv=0;
+    let campaigns = [];
+
+    const filtered = getFilteredCampaigns().filter(c => p === 'all' || c.platform.toLowerCase() === p);
+    filtered.forEach(c => {
+      spend += c.spend; imps += c.impressions; clicks += c.clicks; conv += c.conversions;
+      campaigns.push({
+        platform: c.platform, name: c.name,
+        hq: c.hq || '미매핑',
+        center: c.center || (c.channel==='본사'?'(본사)':'—'),
+        service: c.service,
+        spend: c.spend, imps: c.impressions, clicks: c.clicks, conv: c.conversions
+      });
+    });
+    if (p === 'google') {
+      // scaffold — empty
+      campaigns = [];
+    }
+    document.getElementById('ps-spend').textContent = fmt.money(spend);
+    document.getElementById('ps-imps').textContent = fmt.int(imps);
+    document.getElementById('ps-clicks').textContent = fmt.int(clicks);
+    document.getElementById('ps-phone').textContent = fmt.int(conv);
+    document.getElementById('ps-cpl-phone').textContent = conv > 0 ? fmt.money(spend/conv) : '—';
+    // 신규콜 — 시트 미연동, placeholder
+    document.getElementById('ps-newcomers').textContent = '—';
+    document.getElementById('ps-cpl-newcomer').textContent = '—';
+
+    campaigns.sort((a,b) => b.spend - a.spend);
+
+    const top = campaigns.slice(0, 12);
+    const host = document.getElementById('platformCampaignChart');
+    if (state.charts.platCamp) state.charts.platCamp.destroy();
+    if (!top.length) {
+      host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음${p==='google'?' (Google 미연동)':''}</div>`;
+    } else {
+      host.innerHTML = '';
+      const platColor = (PLATFORM_COLOR[p] || PLATFORM_COLOR.all).primary;
+      // 매체종합일 때는 막대 색상을 캠페인의 매체별로 다르게
+      let barColors;
+      if (p === 'all') {
+        barColors = top.map(c => (PLATFORM_COLOR[c.platform.toLowerCase()] || PLATFORM_COLOR.all).primary);
+      } else {
+        barColors = [platColor];
+      }
+      const opts = {
+        chart: { type:'bar', height:280, toolbar:{show:false} },
+        series: [{ name:'지출', data: top.map(c => Math.round(c.spend)) }],
+        xaxis: { categories: top.map(c => (c.name||'').slice(0,28)), labels: { style: { fontSize: '10px' } } },
+        plotOptions: { bar: { horizontal:true, borderRadius:5, distributed: p==='all', columnWidth: '70%' } },
+        colors: barColors,
+        legend: { show: false },
+        dataLabels: { enabled:false },
+        tooltip: { y: { formatter: v => fmt.money(v) } }
+      };
+      state.charts.platCamp = new ApexCharts(host, opts);
+      state.charts.platCamp.render();
+    }
+
+    const t = document.getElementById('platformCampaignTable');
+    if (!campaigns.length) {
+      t.innerHTML = `<tr><td class="text-center text-slate-400 py-4">데이터 없음</td></tr>`;
+    } else {
+      t.innerHTML = `
+        <thead class="bg-slate-50 text-slate-500 sticky top-0">
+          <tr>
+            <th class="text-left px-2 py-1">매체</th>
+            <th class="text-left px-2 py-1">본부</th>
+            <th class="text-left px-2 py-1">센터</th>
+            <th class="text-left px-2 py-1">서비스</th>
+            <th class="text-left px-2 py-1">캠페인</th>
+            <th class="text-right px-2 py-1">지출</th>
+            <th class="text-right px-2 py-1">전화클릭</th>
+          </tr>
+        </thead><tbody>
+        ${campaigns.map(c => {
+          const hqColor = c.hq === '미매핑' ? 'text-slate-400' : 'text-slate-700 font-medium';
+          return `
+          <tr class="border-t border-slate-100">
+            <td class="px-2 py-1">${platformBadge(c.platform)}</td>
+            <td class="px-2 py-1 ${hqColor}">${c.hq}</td>
+            <td class="px-2 py-1">${c.center}</td>
+            <td class="px-2 py-1 text-slate-500">${c.service}</td>
+            <td class="px-2 py-1">${c.name||''}</td>
+            <td class="px-2 py-1 text-right">${fmt.money(c.spend)}</td>
+            <td class="px-2 py-1 text-right font-medium accent-text">${c.conv}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>`;
+    }
+  }
+
+  // ──────────────────── 이벤트 ────────────────────
+  document.getElementById('dateFilter').addEventListener('change', e => {
+    state.datePreset = e.target.value;
+    loadAll();
+  });
+  function populateCenterDropdown() {
+    const sel = document.getElementById('centerFilter');
+    const current = sel.value;
+    // 공식 명 + 데이터에 실제 등장한 센터 추출명 합집합
+    let baseList;
+    if (state.hq === 'all') {
+      baseList = [...ALL_CENTERS];
+    } else {
+      baseList = [...(HQ_CENTERS[state.hq] || [])];
+    }
+    // 광고 데이터에서 실제 발견된 센터들도 추가 (정규화 후 — 같은 센터 중복 방지)
+    const dataCenters = new Set();
+    (state.naverData?.rows||[]).forEach(r => {
+      if (!r.center) return;
+      const hq = centerToHq(r.center);
+      if (state.hq === 'all' || hq === state.hq) dataCenters.add(normalizeCenterName(r.center));
+    });
+    (state.metaCampaigns?.data||[]).forEach(c => {
+      const cls = classifyByName(c.campaign_name);
+      if (!cls.center) return;
+      const hq = centerToHq(cls.center);
+      if (state.hq === 'all' || hq === state.hq) dataCenters.add(normalizeCenterName(cls.center));
+    });
+    const merged = Array.from(new Set([...baseList, ...dataCenters])).sort();
+    sel.innerHTML = '<option value="all">전체 센터</option>'
+      + merged.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (merged.includes(current)) sel.value = current; else { sel.value = 'all'; state.center = 'all'; }
+  }
+
+  document.getElementById('dateFilter').addEventListener('change', e => {
+    state.datePreset = e.target.value;
+    const customRange = document.getElementById('customDateRange');
+    if (state.datePreset === 'custom') {
+      customRange.classList.remove('hidden');
+      customRange.classList.add('flex');
+      // 기본값: 최근 7일 (오늘 포함)
+      const today = new Date();
+      const past = new Date(today); past.setDate(today.getDate() - 6);
+      const fmtD = d => d.toISOString().slice(0,10);
+      if (!document.getElementById('dateSince').value) document.getElementById('dateSince').value = fmtD(past);
+      if (!document.getElementById('dateUntil').value) document.getElementById('dateUntil').value = fmtD(today);
+      state.since = document.getElementById('dateSince').value;
+      state.until = document.getElementById('dateUntil').value;
+    } else {
+      customRange.classList.add('hidden');
+      customRange.classList.remove('flex');
+      state.since = null; state.until = null;
+    }
+    loadAll();
+  });
+  document.getElementById('dateSince').addEventListener('change', e => {
+    state.since = e.target.value;
+    if (state.until) loadAll();
+  });
+  document.getElementById('dateUntil').addEventListener('change', e => {
+    state.until = e.target.value;
+    if (state.since) loadAll();
+  });
+
+  function rerenderAll() {
+    renderKpiStrip();
+    renderServiceCards();
+    renderHqCards();
+    renderTrendByHq();
+    renderPlatform();
+  }
+
+  document.getElementById('serviceTabs').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-svc]');
+    if (!btn) return;
+    state.service = btn.dataset.svc;
+    document.querySelectorAll('#serviceTabs button').forEach(b => b.classList.toggle('active', b.dataset.svc === state.service));
+    rerenderAll();
+  });
+
+  document.getElementById('hqFilter').addEventListener('change', e => {
+    state.hq = e.target.value;
+    state.center = 'all';
+    populateCenterDropdown();
+    rerenderAll();
+  });
+  document.getElementById('centerFilter').addEventListener('change', e => {
+    state.center = e.target.value;
+    rerenderAll();
+  });
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    state.hq = 'all'; state.center = 'all';
+    document.getElementById('hqFilter').value = 'all';
+    populateCenterDropdown();
+    rerenderAll();
+  });
+  document.getElementById('platformTabs').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-platform]');
+    if (!btn) return;
+    state.platform = btn.dataset.platform;
+    document.querySelectorAll('#platformTabs button').forEach(b => b.classList.toggle('active', b.dataset.platform === state.platform));
+    renderPlatform();
+  });
+
+  populateCenterDropdown();
+  loadAll();
+</script>
+</body>
+</html>

@@ -53,14 +53,19 @@ public class NaverAdsService {
     return Map.of("adGroups", all, "configuredAccounts", active.size());
   }
 
-  @Cacheable(cacheNames = "naverInsights", key = "'campaign:' + #datePreset")
-  public Map<String, Object> getCampaignInsights(String datePreset) {
-    return fetchCampaignInsightsRaw(datePreset);
+  @Cacheable(cacheNames = "naverInsights", key = "'campaign:' + #datePreset + ':' + #since + ':' + #until")
+  public Map<String, Object> getCampaignInsights(String datePreset, String since, String until) {
+    return fetchCampaignInsightsRaw(datePreset, since, until);
   }
 
-  @Cacheable(cacheNames = "naverInsights", key = "'adgroup:' + #datePreset")
-  public Map<String, Object> getAdGroupInsights(String datePreset) {
-    DateSpec spec = resolveDateSpec(datePreset);
+  // Backwards-compat overload (preset only)
+  public Map<String, Object> getCampaignInsights(String datePreset) {
+    return getCampaignInsights(datePreset, null, null);
+  }
+
+  @Cacheable(cacheNames = "naverInsights", key = "'adgroup:' + #datePreset + ':' + #since + ':' + #until")
+  public Map<String, Object> getAdGroupInsights(String datePreset, String since, String until) {
+    DateSpec spec = resolveDateSpec(datePreset, since, until);
     List<NaverAccount> active = props.activeAccounts();
     List<Map<String, Object>> rows = active.parallelStream()
         .flatMap(acc -> fetchAdGroupStats(acc, spec).stream())
@@ -71,9 +76,13 @@ public class NaverAdsService {
         "configuredAccounts", active.size());
   }
 
-  @Cacheable(cacheNames = "naverInsights", key = "'byCategory:' + #datePreset")
-  public Map<String, Object> getInsightsByCategory(String datePreset) {
-    Map<String, Object> raw = fetchCampaignInsightsRaw(datePreset);
+  public Map<String, Object> getAdGroupInsights(String datePreset) {
+    return getAdGroupInsights(datePreset, null, null);
+  }
+
+  @Cacheable(cacheNames = "naverInsights", key = "'byCategory:' + #datePreset + ':' + #since + ':' + #until")
+  public Map<String, Object> getInsightsByCategory(String datePreset, String since, String until) {
+    Map<String, Object> raw = fetchCampaignInsightsRaw(datePreset, since, until);
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> rows =
         (List<Map<String, Object>>) raw.getOrDefault("stats", List.of());
@@ -166,8 +175,8 @@ public class NaverAdsService {
     return map;
   }
 
-  private Map<String, Object> fetchCampaignInsightsRaw(String datePreset) {
-    DateSpec spec = resolveDateSpec(datePreset);
+  private Map<String, Object> fetchCampaignInsightsRaw(String datePreset, String since, String until) {
+    DateSpec spec = resolveDateSpec(datePreset, since, until);
     List<NaverAccount> active = props.activeAccounts();
     List<Map<String, Object>> rows = new ArrayList<>();
     List<Map<String, Object>> errors = new ArrayList<>();
@@ -324,8 +333,11 @@ public class NaverAdsService {
   private record DateSpec(String preset, String since, String until, String label) {}
 
   // last_7d/last_14d/last_30d 는 "오늘 포함 N일" — Meta/Naver 기본 preset이 오늘 제외라
-  // 명시적 time_range 로 통일.
-  private static DateSpec resolveDateSpec(String input) {
+  // 명시적 time_range 로 통일. since/until 둘 다 주면 그대로 사용 (커스텀 범위).
+  private static DateSpec resolveDateSpec(String input, String since, String until) {
+    if (since != null && !since.isBlank() && until != null && !until.isBlank()) {
+      return new DateSpec(null, since, until, since + "~" + until);
+    }
     String preset = (input == null || input.isBlank()) ? DEFAULT_DATE_PRESET : input.toLowerCase();
     LocalDate today = LocalDate.now();
     return switch (preset) {
@@ -343,5 +355,9 @@ public class NaverAdsService {
       default -> new DateSpec(
           null, today.minusDays(6).toString(), today.toString(), "last_7d");
     };
+  }
+
+  private static DateSpec resolveDateSpec(String input) {
+    return resolveDateSpec(input, null, null);
   }
 }

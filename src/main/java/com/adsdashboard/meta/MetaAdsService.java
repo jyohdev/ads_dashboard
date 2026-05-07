@@ -23,19 +23,31 @@ public class MetaAdsService {
     this.client = client;
   }
 
-  @Cacheable(cacheNames = "metaInsights", key = "'account:' + #datePreset")
+  @Cacheable(cacheNames = "metaInsights", key = "'account:' + #datePreset + ':' + #since + ':' + #until")
+  public Map<String, Object> getAccountInsights(String datePreset, String since, String until) {
+    return fetch(ACCOUNT_FIELDS, datePreset, since, until, null, null);
+  }
+
   public Map<String, Object> getAccountInsights(String datePreset) {
-    return fetch(ACCOUNT_FIELDS, datePreset, null, null);
+    return getAccountInsights(datePreset, null, null);
   }
 
-  @Cacheable(cacheNames = "metaInsights", key = "'daily:' + #datePreset")
+  @Cacheable(cacheNames = "metaInsights", key = "'daily:' + #datePreset + ':' + #since + ':' + #until")
+  public Map<String, Object> getDailyInsights(String datePreset, String since, String until) {
+    return fetch(DAILY_FIELDS, datePreset, since, until, null, "1");
+  }
+
   public Map<String, Object> getDailyInsights(String datePreset) {
-    return fetch(DAILY_FIELDS, datePreset, null, "1");
+    return getDailyInsights(datePreset, null, null);
   }
 
-  @Cacheable(cacheNames = "metaInsights", key = "'campaign:' + #datePreset")
+  @Cacheable(cacheNames = "metaInsights", key = "'campaign:' + #datePreset + ':' + #since + ':' + #until")
+  public Map<String, Object> getCampaignInsights(String datePreset, String since, String until) {
+    return fetch(CAMPAIGN_INSIGHT_FIELDS, datePreset, since, until, "campaign", null);
+  }
+
   public Map<String, Object> getCampaignInsights(String datePreset) {
-    return fetch(CAMPAIGN_INSIGHT_FIELDS, datePreset, "campaign", null);
+    return getCampaignInsights(datePreset, null, null);
   }
 
   @Cacheable(cacheNames = "metaCampaigns", key = "'list'")
@@ -43,8 +55,8 @@ public class MetaAdsService {
     return client.listCampaigns(CAMPAIGN_LIST_FIELDS);
   }
 
-  private Map<String, Object> fetch(String fields, String datePreset, String level, String timeIncrement) {
-    DateSpec spec = resolveDateSpec(datePreset);
+  private Map<String, Object> fetch(String fields, String datePreset, String since, String until, String level, String timeIncrement) {
+    DateSpec spec = resolveDateSpec(datePreset, since, until);
     if (spec.preset() != null) {
       return client.getAdAccountInsights(fields, spec.preset(), level, timeIncrement);
     }
@@ -54,8 +66,11 @@ public class MetaAdsService {
 
   private record DateSpec(String preset, String since, String until) {}
 
-  // last_7d/last_14d/last_30d 는 "오늘 포함 N일" 의미로 명시적 time_range 사용 (Meta 기본은 오늘 제외).
-  private static DateSpec resolveDateSpec(String input) {
+  // last_7d/last_14d/last_30d 는 "오늘 포함 N일" — since/until 직접 주면 그대로 time_range.
+  private static DateSpec resolveDateSpec(String input, String since, String until) {
+    if (since != null && !since.isBlank() && until != null && !until.isBlank()) {
+      return new DateSpec(null, since, until);
+    }
     String preset = (input == null || input.isBlank()) ? DEFAULT_DATE_PRESET : input;
     LocalDate today = LocalDate.now();
     return switch (preset) {

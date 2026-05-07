@@ -22,20 +22,26 @@ public class MetaAdsController {
 
   @GetMapping("/insights")
   public Map<String, Object> insights(
-      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
-    return service.getAccountInsights(datePreset);
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset,
+      @RequestParam(required = false) String since,
+      @RequestParam(required = false) String until) {
+    return service.getAccountInsights(datePreset, since, until);
   }
 
   @GetMapping("/insights/daily")
   public Map<String, Object> dailyInsights(
-      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
-    return service.getDailyInsights(datePreset);
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset,
+      @RequestParam(required = false) String since,
+      @RequestParam(required = false) String until) {
+    return service.getDailyInsights(datePreset, since, until);
   }
 
   @GetMapping("/insights/campaigns")
   public Map<String, Object> campaignInsights(
-      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
-    return service.getCampaignInsights(datePreset);
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset,
+      @RequestParam(required = false) String since,
+      @RequestParam(required = false) String until) {
+    return service.getCampaignInsights(datePreset, since, until);
   }
 
   @GetMapping("/campaigns")

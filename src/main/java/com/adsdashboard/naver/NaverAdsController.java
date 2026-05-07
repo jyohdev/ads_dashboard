@@ -32,20 +32,26 @@ public class NaverAdsController {
 
   @GetMapping("/insights/campaigns")
   public Map<String, Object> campaignInsights(
-      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
-    return service.getCampaignInsights(datePreset);
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset,
+      @RequestParam(required = false) String since,
+      @RequestParam(required = false) String until) {
+    return service.getCampaignInsights(datePreset, since, until);
   }
 
   @GetMapping("/insights/adgroups")
   public Map<String, Object> adGroupInsights(
-      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
-    return service.getAdGroupInsights(datePreset);
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset,
+      @RequestParam(required = false) String since,
+      @RequestParam(required = false) String until) {
+    return service.getAdGroupInsights(datePreset, since, until);
   }
 
   @GetMapping("/insights/by-category")
   public Map<String, Object> insightsByCategory(
-      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset) {
-    return service.getInsightsByCategory(datePreset);
+      @RequestParam(required = false, defaultValue = DEFAULT_DATE_PRESET) String datePreset,
+      @RequestParam(required = false) String since,
+      @RequestParam(required = false) String until) {
+    return service.getInsightsByCategory(datePreset, since, until);
   }
 
   @ExceptionHandler(NaverAdsClient.NaverAdsApiException.class)
