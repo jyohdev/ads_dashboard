@@ -18,6 +18,7 @@ public class CacheConfig {
   static final String GOOGLE_CAMPAIGNS_CACHE = "googleCampaigns";
   static final String NAVER_INSIGHTS_CACHE = "naverInsights";
   static final String NAVER_CAMPAIGNS_CACHE = "naverCampaigns";
+  static final String LEADS_CACHE = "leads";
 
   @Bean
   public CacheManager cacheManager() {
@@ -27,7 +28,8 @@ public class CacheConfig {
         GOOGLE_INSIGHTS_CACHE,
         GOOGLE_CAMPAIGNS_CACHE,
         NAVER_INSIGHTS_CACHE,
-        NAVER_CAMPAIGNS_CACHE);
+        NAVER_CAMPAIGNS_CACHE,
+        LEADS_CACHE);
     manager.setCaffeine(Caffeine.newBuilder()
         .expireAfterWrite(60, TimeUnit.SECONDS)
         .maximumSize(100));

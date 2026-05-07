@@ -383,7 +383,7 @@
     short: n => { n = Number(n||0); if (n >= 1e8) return (n/1e8).toFixed(1)+'억'; if (n >= 1e4) return (n/1e4).toFixed(1)+'만'; return Math.round(n).toLocaleString(); }
   };
 
-  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null };
+  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, leadData:null };
 
   function buildDateQuery() {
     if (state.datePreset === 'custom' && state.since && state.until) {
@@ -520,15 +520,20 @@
     const label = dp === 'custom' && state.since && state.until ? `${state.since} ~ ${state.until}` : (presetLabels[dp] || dp);
     document.getElementById('kpi-period-label').textContent = label;
     const q = buildDateQuery();
+    const leadQ = q
+      + (state.hq !== 'all' ? `&hq=${encodeURIComponent(state.hq)}` : '')
+      + (state.center !== 'all' ? `&center=${encodeURIComponent(state.center)}` : '');
     try {
-      const [naver, meta, metaCamps] = await Promise.all([
+      const [naver, meta, metaCamps, leads] = await Promise.all([
         fetchJson(`/api/naver/insights/by-category?${q}`),
         fetchJson(`/api/meta/insights?${q}`),
-        fetchJson(`/api/meta/insights/campaigns?${q}`)
+        fetchJson(`/api/meta/insights/campaigns?${q}`),
+        fetchJson(`/api/leads/by-category?${leadQ}`).catch(() => ({ total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }))
       ]);
       state.naverData = naver;
       state.metaData = meta;
       state.metaCampaigns = metaCamps;
+      state.leadData = leads;
       renderKpiStrip();
       renderServiceCards();
       renderHqCards();
@@ -552,7 +557,8 @@
     document.getElementById('kpi-impressions').textContent = fmt.int(sum.imps);
     document.getElementById('kpi-clicks').textContent = fmt.int(sum.clicks);
     document.getElementById('kpi-conversions').textContent = fmt.int(sum.conv);
-    document.getElementById('kpi-newcomers').textContent = '—';
+    const newCalls = Number(state.leadData?.total || 0);
+    document.getElementById('kpi-newcomers').textContent = newCalls > 0 ? fmt.int(newCalls) : '—';
     const hero = document.getElementById('hero-spend');
     if (hero) hero.textContent = fmt.money(sum.spend);
   }
@@ -753,8 +759,9 @@
     const host = document.getElementById('trendByHq');
     if (state.charts.byHq) state.charts.byHq.destroy();
     const buckets = aggregateByHq();
-    // 신규콜 — 시트 미연동, placeholder 0
-    const newCallsByHq = HQ_LIST.map(_ => 0);
+    // 신규콜 — 시트 연동된 byHq 사용 (없으면 0)
+    const leadByHq = state.leadData?.byHq || {};
+    const newCallsByHq = HQ_LIST.map(h => Number(leadByHq[h] || 0));
     const opts = {
       chart: { type: 'line', height: 300, toolbar: { show: false }, stacked: false },
       series: [
@@ -809,9 +816,9 @@
     document.getElementById('ps-clicks').textContent = fmt.int(clicks);
     document.getElementById('ps-phone').textContent = fmt.int(conv);
     document.getElementById('ps-cpl-phone').textContent = conv > 0 ? fmt.money(spend/conv) : '—';
-    // 신규콜 — 시트 미연동, placeholder
-    document.getElementById('ps-newcomers').textContent = '—';
-    document.getElementById('ps-cpl-newcomer').textContent = '—';
+    const newCalls = Number(state.leadData?.total || 0);
+    document.getElementById('ps-newcomers').textContent = newCalls > 0 ? fmt.int(newCalls) : '—';
+    document.getElementById('ps-cpl-newcomer').textContent = newCalls > 0 ? fmt.money(spend/newCalls) : '—';
 
     campaigns.sort((a,b) => b.spend - a.spend);
 
