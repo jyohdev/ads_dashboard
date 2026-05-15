@@ -235,14 +235,18 @@
     <h2 class="section-title mb-3">추이 분석</h2>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-5">
-        <h3 class="text-sm font-semibold mb-3">전사 일별 지출/전환 추이</h3>
-        <div id="trendOverall" style="height:300px"></div>
+        <h3 class="text-sm font-semibold mb-3">본부별 광고 비용 비중 <span class="text-xs text-slate-400 font-normal">온라인 + 오프라인 합산</span></h3>
+        <div id="costByHqDonut" style="height:300px"></div>
       </div>
       <div class="card p-5">
-        <h3 class="text-sm font-semibold mb-3">본부별 종합 <span class="text-xs text-slate-400 font-normal">지출 · 전화클릭 · 신규콜</span></h3>
-        <div id="trendByHq" style="height:300px"></div>
-        <p class="text-xs text-slate-400 mt-2">막대=전화클릭·신규콜(좌축), 선=지출(우축)</p>
+        <h3 class="text-sm font-semibold mb-3">센터별 광고 비용 비중 <span class="text-xs text-slate-400 font-normal">상위 12개 센터</span></h3>
+        <div id="costByCenterDonut" style="height:300px"></div>
       </div>
+    </div>
+    <div class="card p-5 mt-4">
+      <h3 class="text-sm font-semibold mb-3">본부별 종합 <span class="text-xs text-slate-400 font-normal">지출 · 전화클릭 · 신규콜</span></h3>
+      <div id="trendByHq" style="height:300px"></div>
+      <p class="text-xs text-slate-400 mt-2">막대=전화클릭·신규콜(좌축), 선=지출(우축)</p>
     </div>
   </section>
 
@@ -934,12 +938,83 @@
   });
 
   // ──────────────────── 추이 차트 ────────────────────
+  /** 본부별 + 센터별 광고 비용 도넛 (온라인 + 오프라인 합산). renderTrendOverall 자리. */
   function renderTrendOverall() {
-    // Meta 일별만 사용 — Naver 일별은 비동기 리포트 필요 (미연동)
-    const host = document.getElementById('trendOverall');
-    if (state.charts.overall) state.charts.overall.destroy();
-    host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-400 text-center">
-      <div>일별 추이 — Meta 일별만 가능 (Naver 비동기 리포트 미연동)<br/>실제 구현 시 두 매체 통합</div></div>`;
+    renderCostByHqDonut();
+    renderCostByCenterDonut();
+  }
+
+  function renderCostByHqDonut() {
+    const host = document.getElementById('costByHqDonut');
+    if (!host) return;
+    if (state.charts.costHq) state.charts.costHq.destroy();
+    // 본부별 온라인 지출
+    const cs = getFilteredCampaigns();
+    const byHq = {};
+    HQ_LIST.forEach(h => byHq[h] = 0);
+    cs.forEach(c => {
+      const hq = c.hq || '미매핑';
+      byHq[hq] = (byHq[hq] || 0) + c.spend;
+    });
+    // 오프라인 추가
+    const offHq = state.offlineData?.byHq || {};
+    Object.entries(offHq).forEach(([k, v]) => { byHq[k] = (byHq[k] || 0) + Number(v || 0); });
+
+    const entries = Object.entries(byHq).filter(([_, v]) => v > 0).sort((a,b) => b[1] - a[1]);
+    if (!entries.length) {
+      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음</div>';
+      return;
+    }
+    host.innerHTML = '';
+    state.charts.costHq = new ApexCharts(host, {
+      chart: { type: 'donut', height: 300 },
+      series: entries.map(([_, v]) => Math.round(v)),
+      labels: entries.map(([k]) => k),
+      colors: ['#EF6079','#F8A1B4','#5BA8A0','#16A34A','#1E3A8A','#F59E0B','#A78BFA','#0EA5E9'],
+      legend: { position: 'right', fontSize: '11px' },
+      dataLabels: { formatter: v => v.toFixed(1) + '%' },
+      tooltip: { y: { formatter: v => fmt.money(v) } },
+      plotOptions: { pie: { donut: { size: '62%', labels: {
+        show: true,
+        total: { show: true, label: '총 비용', formatter: () => fmt.money(entries.reduce((a, [_,v]) => a+v, 0)) }
+      } } } }
+    });
+    state.charts.costHq.render();
+  }
+
+  function renderCostByCenterDonut() {
+    const host = document.getElementById('costByCenterDonut');
+    if (!host) return;
+    if (state.charts.costCenter) state.charts.costCenter.destroy();
+    const cs = getFilteredCampaigns();
+    const byCenter = {};
+    cs.forEach(c => {
+      const k = c.center || (c.channel === '본사' ? '(본사)' : '미매핑');
+      byCenter[k] = (byCenter[k] || 0) + c.spend;
+    });
+    const offCenter = state.offlineData?.byCenter || {};
+    Object.entries(offCenter).forEach(([k, v]) => { byCenter[k] = (byCenter[k] || 0) + Number(v || 0); });
+
+    const entries = Object.entries(byCenter).filter(([_, v]) => v > 0).sort((a,b) => b[1] - a[1]).slice(0, 12);
+    if (!entries.length) {
+      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음</div>';
+      return;
+    }
+    host.innerHTML = '';
+    state.charts.costCenter = new ApexCharts(host, {
+      chart: { type: 'donut', height: 300 },
+      series: entries.map(([_, v]) => Math.round(v)),
+      labels: entries.map(([k]) => k),
+      colors: ['#EF6079','#F8A1B4','#FB923C','#F59E0B','#EAB308','#16A34A','#10B981','#5BA8A0','#0EA5E9','#1E3A8A','#A78BFA','#EC4899'],
+      legend: { position: 'right', fontSize: '11px' },
+      dataLabels: { formatter: v => v.toFixed(1) + '%' },
+      tooltip: { y: { formatter: v => fmt.money(v) } },
+      plotOptions: { pie: { donut: { size: '62%', labels: {
+        show: true,
+        total: { show: true, label: '상위 12 센터', formatter: () => fmt.money(entries.reduce((a, [_,v]) => a+v, 0)) }
+      } } } }
+    });
+    state.charts.costCenter.render();
   }
 
   function renderTrendByHq() {
