@@ -72,17 +72,19 @@ public class OfflineSheetFetcher {
     Integer hqI = idx.get("hq");
     Integer centerI = idx.get("center");
     Integer serviceI = idx.get("service");
-    Integer typeI = idx.get("type");           // "종류" — 온라인/오프라인 구분
+    Integer typeI = idx.get("type");           // "종류" — 온라인/오프라인/센터지원/판촉물
     Integer mediaI = idx.get("offlineMedia");  // "오프라인 유입" — 신문광고, 현수막 등
+    Integer noteI = idx.get("note");           // "비고" — 자유 텍스트
     Integer amountI = idx.get("amount");
 
     List<OfflineEntry> rows = new ArrayList<>();
     for (int i = hdrIdx + 1; i < values.size(); i++) {
       List<Object> row = values.get(i);
       if (row == null || row.isEmpty()) continue;
-      // "종류" 가 "오프라인" 이 아닌 행은 스킵 (시트에 온라인 데이터도 섞여있음)
+      // 종류 = 오프라인 / 센터지원 / 판촉물 만 포함 (온라인 제외)
       String type = typeI != null ? blankToNull(cell(row, typeI)) : null;
-      if (type != null && !type.contains("오프라인")) continue;
+      if (type == null) continue;
+      if (type.contains("온라인") && !type.contains("오프라인")) continue;
       LocalDate d = dateI != null ? parseDate(cell(row, dateI)) : null;
       if (d == null) continue;
       Long amount = amountI != null ? parseAmount(cell(row, amountI)) : null;
@@ -90,10 +92,39 @@ public class OfflineSheetFetcher {
       String hq = hqI != null ? blankToNull(cell(row, hqI)) : null;
       String center = centerI != null ? blankToNull(cell(row, centerI)) : null;
       String svc = serviceI != null ? blankToNull(cell(row, serviceI)) : null;
-      String media = mediaI != null ? blankToNull(cell(row, mediaI)) : null;
-      rows.add(new OfflineEntry(d, hq, center, svc, media, amount));
+      String mediaRaw = mediaI != null ? blankToNull(cell(row, mediaI)) : null;
+      String note = noteI != null ? blankToNull(cell(row, noteI)) : null;
+      String mediaResolved = resolveMedia(mediaRaw, note, type);
+      rows.add(new OfflineEntry(d, hq, center, svc, mediaResolved, type, note, amount));
     }
     return rows;
+  }
+
+  /** 표시용 매체 분류 결정.
+   *  1) 오프라인유입 컬럼이 명시돼 있고 "기타" 가 아니면 그대로 사용
+   *  2) "기타" 이거나 비어있으면 비고에서 핵심 키워드 추출 (부채/파스/물티슈/배너/현수막/리플릿/포스터/안내문/스티커/약국봉투/마트영상/포스터/가림막/판촉물스티커)
+   *  3) 키워드 매칭 실패하면 종류(센터지원/판촉물/오프라인) 그대로 라벨로 사용
+   */
+  private static final String[] MEDIA_KEYWORDS = {
+      "파스", "부채", "물티슈", "자석스티커", "판촉물스티커", "스티커",
+      "약국봉투", "마트 영상", "마트영상", "차량 부착", "차량부착",
+      "배너", "현수막", "리플릿", "포스터", "안내문", "안내판",
+      "전단지", "깔판", "가림막", "선반", "간판"
+  };
+
+  private static String resolveMedia(String mediaRaw, String note, String kind) {
+    if (mediaRaw != null && !mediaRaw.isBlank() && !"기타".equals(mediaRaw)) {
+      return mediaRaw;
+    }
+    if (note != null && !note.isBlank()) {
+      for (String kw : MEDIA_KEYWORDS) {
+        if (note.contains(kw)) return kw;
+      }
+    }
+    if (kind != null && !kind.isBlank() && !"오프라인".equals(kind)) {
+      return kind; // 센터지원 / 판촉물 — 더 자세한 매체 못 찾으면 종류 자체를 라벨로
+    }
+    return "기타";
   }
 
   private static Map<String, Integer> headerIndex(List<String> headers) {
@@ -107,6 +138,7 @@ public class OfflineSheetFetcher {
         case "서비스", "service" -> m.put("service", i);
         case "종류", "구분", "type" -> m.put("type", i);
         case "오프라인유입", "오프라인", "오프라인매체", "offline" -> m.put("offlineMedia", i);
+        case "비고", "메모", "note", "remark" -> m.put("note", i);
         case "금액(원)", "금액", "amount", "비용" -> m.put("amount", i);
         default -> {}
       }
