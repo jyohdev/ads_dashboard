@@ -38,6 +38,14 @@ offline:
   service-account-key: ${GOOGLE_SERVICE_ACCOUNT_KEY:}
   service-account-key-path: ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH:}
 
+cac:
+  # CAC 시트 (마케팅팀 지표 — 주간보호 신규수급자/비용/CAC)
+  sheet-id: ${CAC_SHEET_ID:}
+  hq-tab: ${CAC_HQ_TAB:본부 신규/비용/CAC_26년}
+  center-tab: ${CAC_CENTER_TAB:센터별 비용/CAC_서비스 분류}
+  service-account-key: ${GOOGLE_SERVICE_ACCOUNT_KEY:}
+  service-account-key-path: ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH:}
+
 management:
   endpoints:
     web:
