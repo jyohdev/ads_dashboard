@@ -1193,15 +1193,13 @@
       const tone = isOnline ? '#EF6079' : '#5BA8A0';
       const title = isOnline ? '온라인 광고' : '오프라인 광고';
       const isWinner = winner === kind;
-      const isLoser  = winner != null && !isWinner;
 
-      // 우위: 채도 진하게 + 굵은 보더 + 살짝 그림자
-      // 비우위: 흐릿하게 (opacity 살짝 + 회색톤)
+      // 우위: 채도 진하게 + 굵은 보더 + 그림자 + 폰트 키움
+      // 비우위: 원래 디자인 그대로 (흐릿하게 처리 X)
       const bg   = isWinner ? (isOnline ? '#FEE2E8' : '#D7EBE7')
-                            : (isOnline ? '#FEF6F8' : '#F1F8F6');
-      const border = isWinner ? `2px solid ${tone}` : `1px solid ${tone}22`;
+                            : (isOnline ? '#FEF1F4' : '#ECF5F3');
+      const border = isWinner ? `2px solid ${tone}` : `1px solid ${tone}33`;
       const shadow = isWinner ? `box-shadow: 0 4px 14px ${tone}33;` : '';
-      const opacity = isLoser ? 'opacity:0.6;' : '';
       const titleSize = isWinner ? 'text-base font-extrabold' : 'text-sm font-semibold';
       const cpaSize = isWinner ? 'text-2xl font-extrabold' : 'text-lg font-bold';
 
@@ -1210,7 +1208,7 @@
         : '';
       const cpaStr = cpa == null ? '—' : fmt.money(Math.round(cpa));
       return `
-        <div class="p-4 rounded-xl" style="background:${bg};border:${border};${shadow}${opacity}transition:all 0.2s">
+        <div class="p-4 rounded-xl" style="background:${bg};border:${border};${shadow}transition:all 0.2s">
           <div class="flex items-center mb-3">
             <span class="${titleSize}" style="color:${tone}">${title}</span>${winBadge}
           </div>
