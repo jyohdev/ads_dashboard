@@ -30,6 +30,9 @@
     .card-hover:hover { box-shadow: 0 4px 12px rgba(15,23,42,0.08); transform: translateY(-1px); transition: all .18s; }
     .card-soft { background: var(--caring-primary-tint); border-radius: 16px; }
     .placeholder { background: repeating-linear-gradient(45deg,#fafafa,#fafafa 6px,#f4f4f4 6px,#f4f4f4 12px); }
+    /* 신규콜 = 최우선 KPI 강조 (앰버/골드 톤) */
+    .kpi-newcall { background: linear-gradient(135deg,#FFFBEB 0%,#FEF3C7 100%); border: 1px solid #FDE68A; box-shadow: 0 1px 3px rgba(245,158,11,0.10); }
+    .newcall-text { color: #B45309; }
     .accent-text { color: var(--caring-primary); }
     .accent-bg { background: var(--caring-primary); color:#fff; }
     .filter-input { border:1px solid #E5E5E5; border-radius: 9px; padding: .4rem .8rem; font-size: 0.875rem; background:#fff; }
@@ -98,7 +101,7 @@
         <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Naver Ads · 7개</div>
         <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Meta Ads</div>
         <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-sky-400"></span> Google Ads</div>
-        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> 신규콜 시트</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400"></span> 신규콜 시트</div>
       </div>
     </div>
   </aside>
@@ -189,9 +192,9 @@
         <p class="text-xs text-slate-500">전화 클릭</p>
         <p class="text-xl font-bold mt-2 accent-text" id="kpi-conversions">—</p>
       </div>
-      <div class="card p-5 placeholder">
-        <p class="text-xs text-slate-500">신규콜</p>
-        <p class="text-xl font-bold mt-2" id="kpi-newcomers">—</p>
+      <div class="card p-5 kpi-newcall">
+        <p class="text-xs font-medium newcall-text">신규콜</p>
+        <p class="text-2xl font-bold mt-2 newcall-text" id="kpi-newcomers">—</p>
         <p class="text-[10px] text-slate-400 mt-1">시트 연동 대기</p>
       </div>
     </div>
@@ -235,7 +238,7 @@
       <div class="card p-5">
         <h3 class="text-sm font-semibold mb-3">본부별 종합 <span class="text-xs text-slate-400 font-normal">지출 · 전화클릭 · 신규콜</span></h3>
         <div id="trendByHq" style="height:300px"></div>
-        <p class="text-xs text-slate-400 mt-2">막대=전화클릭·신규콜(좌축), 선=지출(우축). 신규콜은 시트 연동 후 채워짐.</p>
+        <p class="text-xs text-slate-400 mt-2">막대=전화클릭·신규콜(좌축), 선=지출(우축)</p>
       </div>
     </div>
   </section>
@@ -259,9 +262,9 @@
         <div><p class="mini-stat">노출</p><p class="text-lg font-bold mt-0.5" id="ps-imps">—</p></div>
         <div><p class="mini-stat">클릭</p><p class="text-lg font-bold mt-0.5" id="ps-clicks">—</p></div>
         <div><p class="mini-stat accent-text">전화 클릭</p><p class="text-lg font-bold mt-0.5 accent-text" id="ps-phone">—</p></div>
-        <div class="placeholder rounded-lg px-1"><p class="mini-stat">신규콜</p><p class="text-lg font-bold mt-0.5" id="ps-newcomers">—</p></div>
+        <div class="kpi-newcall rounded-lg px-2 py-1"><p class="mini-stat newcall-text">신규콜</p><p class="text-lg font-bold mt-0.5 newcall-text" id="ps-newcomers">—</p></div>
         <div><p class="mini-stat accent-text">전화클릭당 비용</p><p class="text-lg font-bold mt-0.5 accent-text" id="ps-cpl-phone">—</p></div>
-        <div class="placeholder rounded-lg px-1"><p class="mini-stat">신규콜당 비용</p><p class="text-lg font-bold mt-0.5" id="ps-cpl-newcomer">—</p></div>
+        <div class="kpi-newcall rounded-lg px-2 py-1"><p class="mini-stat newcall-text">신규콜당 비용</p><p class="text-lg font-bold mt-0.5 newcall-text" id="ps-cpl-newcomer">—</p></div>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div>
@@ -278,7 +281,7 @@
     </div>
   </section>
 
-  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 광고 대시보드 · 데이터는 Meta · Naver API 실시간 · 본부 매핑·신규콜은 시트 연동 대기</p>
+  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 광고 대시보드 · Meta · Google Ads · Naver API 실시간 · 신규콜은 Google Sheets 연동</p>
 </main>
 
   </div>
@@ -597,6 +600,26 @@
     });
   }
 
+  /** state.service 에 맞는 신규콜 수치 선택 (백엔드는 hq/center만 필터, service는 byService에서 선택). */
+  function pickLeadCount() {
+    const ld = state.leadData;
+    if (!ld) return 0;
+    if (state.service === 'all') return Number(ld.total || 0);
+    if (ld.byService && ld.byService[state.service] != null) return Number(ld.byService[state.service]);
+    return 0;
+  }
+
+  /** 본부/센터 필터 변경 시 신규콜만 가볍게 재조회 (전체 loadAll 안 함). */
+  function loadLeads() {
+    const q = buildDateQuery();
+    const leadQ = q
+      + (state.hq !== 'all' ? `&hq=${encodeURIComponent(state.hq)}` : '')
+      + (state.center !== 'all' ? `&center=${encodeURIComponent(state.center)}` : '');
+    return fetchJson(`/api/leads/by-category?${leadQ}`)
+      .then(d => { state.leadData = d; renderAllSafe(); })
+      .catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); });
+  }
+
   function renderAllSafe() {
     try {
       renderKpiStrip();
@@ -621,7 +644,7 @@
     document.getElementById('kpi-impressions').textContent = fmt.int(sum.imps);
     document.getElementById('kpi-clicks').textContent = fmt.int(sum.clicks);
     document.getElementById('kpi-conversions').textContent = fmt.int(sum.conv);
-    const newCalls = Number(state.leadData?.total || 0);
+    const newCalls = pickLeadCount();
     document.getElementById('kpi-newcomers').textContent = newCalls > 0 ? fmt.int(newCalls) : '—';
     const hero = document.getElementById('hero-spend');
     if (hero) hero.textContent = fmt.money(sum.spend);
@@ -842,7 +865,7 @@
         { seriesName: '지출(₩)', opposite: true, title: { text: '지출(₩)' }, labels: { formatter: v => fmt.short(v) } }
       ],
       plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
-      colors: ['#EF6079', '#F8A1B4', '#5BA8A0'],
+      colors: ['#EF6079', '#F59E0B', '#5BA8A0'],
       legend: { position: 'top', horizontalAlign: 'left', fontSize: '12px' },
       tooltip: {
         y: {
@@ -876,7 +899,7 @@
     document.getElementById('ps-clicks').textContent = fmt.int(clicks);
     document.getElementById('ps-phone').textContent = fmt.int(conv);
     document.getElementById('ps-cpl-phone').textContent = conv > 0 ? fmt.money(spend/conv) : '—';
-    const newCalls = Number(state.leadData?.total || 0);
+    const newCalls = pickLeadCount();
     document.getElementById('ps-newcomers').textContent = newCalls > 0 ? fmt.int(newCalls) : '—';
     document.getElementById('ps-cpl-newcomer').textContent = newCalls > 0 ? fmt.money(spend/newCalls) : '—';
 
@@ -1035,16 +1058,19 @@
     state.center = 'all';
     populateCenterDropdown();
     rerenderAll();
+    loadLeads();
   });
   document.getElementById('centerFilter').addEventListener('change', e => {
     state.center = e.target.value;
     rerenderAll();
+    loadLeads();
   });
   document.getElementById('resetFilters').addEventListener('click', () => {
     state.hq = 'all'; state.center = 'all';
     document.getElementById('hqFilter').value = 'all';
     populateCenterDropdown();
     rerenderAll();
+    loadLeads();
   });
   document.getElementById('platformTabs').addEventListener('click', e => {
     const btn = e.target.closest('button[data-platform]');

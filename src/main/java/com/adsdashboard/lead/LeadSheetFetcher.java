@@ -161,6 +161,9 @@ public class LeadSheetFetcher implements LeadFetcher {
           else dc = c;
         }
       }
+      // 시트 raw 명 → 대시보드 공식 명 (HQ_CENTERS) 으로 정규화
+      dc = CenterNameNormalizer.normalize(dc);
+      hc = CenterNameNormalizer.normalize(hc);
       rows.add(new LeadEntry(d, hq, dc, hc));
     }
     return rows;
