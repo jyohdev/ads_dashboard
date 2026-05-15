@@ -29,6 +29,15 @@ lead:
   service-account-key: ${GOOGLE_SERVICE_ACCOUNT_KEY:}
   service-account-key-path: ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH:}
 
+offline:
+  # 오프라인 광고비 시트 (lead 와 같은 서비스 계정 자격증명 재사용)
+  sheet-id: ${OFFLINE_SHEET_ID:}
+  sheet-range: ${OFFLINE_SHEET_RANGE:A:Z}
+  # 시트 1행이 안내문이고 진짜 헤더가 2행이면 1
+  header-row-offset: ${OFFLINE_HEADER_ROW_OFFSET:1}
+  service-account-key: ${GOOGLE_SERVICE_ACCOUNT_KEY:}
+  service-account-key-path: ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH:}
+
 management:
   endpoints:
     web:

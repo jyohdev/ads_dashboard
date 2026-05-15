@@ -94,6 +94,10 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16M16 4v16"/></svg>
         <span>매체별 상세</span>
       </a>
+      <a class="nav-item" href="#section-offline">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-6 9 6v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9z"/><path d="M9 21V12h6v9"/></svg>
+        <span>오프라인 광고</span>
+      </a>
     </nav>
     <div class="mt-8 pt-4 border-t border-slate-100">
       <p class="px-2 text-[11px] text-slate-400 mb-2">데이터 소스</p>
@@ -281,7 +285,35 @@
     </div>
   </section>
 
-  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 광고 대시보드 · Meta · Google Ads · Naver API 실시간 · 신규콜은 Google Sheets 연동</p>
+  <!-- Section 5: 오프라인 광고 -->
+  <section id="section-offline">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="section-title">오프라인 광고</h2>
+      <span class="section-sub">현수막 · 게시판 · 지하철광고 · 신문 · 전단지</span>
+    </div>
+    <div class="card p-5">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 pb-5 border-b border-slate-100">
+        <div><p class="mini-stat">총 오프라인 비용</p><p class="text-lg font-bold mt-0.5" id="off-total">—</p></div>
+        <div><p class="mini-stat">집행 건수</p><p class="text-lg font-bold mt-0.5" id="off-count">—</p></div>
+        <div><p class="mini-stat">매체 종류</p><p class="text-lg font-bold mt-0.5" id="off-media-count">—</p></div>
+        <div><p class="mini-stat">평균 단가</p><p class="text-lg font-bold mt-0.5" id="off-avg">—</p></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+          <h4 class="text-xs font-semibold text-slate-600 mb-2">매체별 비용</h4>
+          <div id="offlineMediaChart" style="height:280px"></div>
+        </div>
+        <div>
+          <h4 class="text-xs font-semibold text-slate-600 mb-2">최근 집행 내역</h4>
+          <div class="overflow-x-auto max-h-72 overflow-y-auto scrollbar-thin">
+            <table class="w-full text-xs" id="offlineTable"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 광고 대시보드 · Meta · Google Ads · Naver API 실시간 · 신규콜·오프라인은 Google Sheets 연동</p>
 </main>
 
   </div>
@@ -399,7 +431,7 @@
     return `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium" style="background:${c.soft};color:${c.text}">${p}</span>`;
   }
 
-  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null };
+  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null };
 
   function buildDateQuery() {
     if (state.datePreset === 'custom' && state.since && state.until) {
@@ -583,6 +615,7 @@
     state.metaCampaigns = null;
     state.googleCampaigns = null;
     state.leadData = null;
+    state.offlineData = null;
     document.getElementById('lastUpdated').textContent = '로딩 중…';
     renderAllSafe();
 
@@ -591,6 +624,7 @@
       fetchJson(`/api/meta/insights/campaigns?${q}`).then(d => { state.metaCampaigns = d; renderAllSafe(); }).catch(e => console.error('metaCamps', e)),
       fetchJson(`/api/google/insights/campaigns?${q}`).then(d => { state.googleCampaigns = d; renderAllSafe(); }).catch(e => { console.error('google', e); state.googleCampaigns = { results: [] }; renderAllSafe(); }),
       fetchJson(`/api/leads/by-category?${leadQ}`).then(d => { state.leadData = d; renderAllSafe(); }).catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); }),
+      fetchJson(`/api/offline/by-category?${leadQ}`).then(d => { state.offlineData = d; renderAllSafe(); }).catch(() => { state.offlineData = { totalAmount:0, totalCount:0, byMedia:{}, byHq:{}, byCenter:{}, byDate:{}, rows:[] }; renderAllSafe(); }),
       // Naver는 7개 계정 직렬 호출이라 가장 느림 — 마지막에 채워짐
       fetchJson(`/api/naver/insights/by-category?${q}`).then(d => { state.naverData = d; renderAllSafe(); }).catch(e => console.error('naver', e)),
     ];
@@ -598,6 +632,64 @@
     Promise.allSettled(tasks).then(() => {
       document.getElementById('lastUpdated').textContent = '최종 ' + new Date().toLocaleTimeString('ko-KR');
     });
+  }
+
+  // ──────────────────── 오프라인 광고 ────────────────────
+  function renderOffline() {
+    const d = state.offlineData;
+    const total = Number(d?.totalAmount || 0);
+    const cnt = Number(d?.totalCount || 0);
+    const media = d?.byMedia || {};
+    const mediaEntries = Object.entries(media).sort((a,b) => b[1] - a[1]);
+    document.getElementById('off-total').textContent = total > 0 ? fmt.money(total) : '—';
+    document.getElementById('off-count').textContent = cnt > 0 ? fmt.int(cnt) + '건' : '—';
+    document.getElementById('off-media-count').textContent = mediaEntries.length > 0 ? mediaEntries.length + '종' : '—';
+    document.getElementById('off-avg').textContent = cnt > 0 ? fmt.money(total / cnt) : '—';
+
+    // 매체별 비용 차트
+    const host = document.getElementById('offlineMediaChart');
+    if (state.charts.offlineMedia) state.charts.offlineMedia.destroy();
+    if (!mediaEntries.length) {
+      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음</div>';
+    } else {
+      host.innerHTML = '';
+      state.charts.offlineMedia = new ApexCharts(host, {
+        chart: { type:'bar', height:280, toolbar:{show:false} },
+        series: [{ name:'비용', data: mediaEntries.map(([_,v]) => v) }],
+        xaxis: { categories: mediaEntries.map(([k,_]) => k), labels: { style: { fontSize: '11px' } } },
+        plotOptions: { bar: { horizontal:true, borderRadius:5, distributed:true } },
+        colors: ['#5BA8A0','#F59E0B','#1E3A8A','#16A34A','#EF6079','#A78BFA','#0EA5E9','#FB923C'],
+        legend: { show:false },
+        dataLabels: { enabled:false },
+        tooltip: { y: { formatter: v => fmt.money(v) } }
+      });
+      state.charts.offlineMedia.render();
+    }
+
+    // 최근 집행 내역 테이블 (최근 일자 순)
+    const rows = (d?.rows || []).slice().sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const tbl = document.getElementById('offlineTable');
+    if (!rows.length) {
+      tbl.innerHTML = '<tr><td class="text-center text-slate-400 py-4">데이터 없음</td></tr>';
+    } else {
+      tbl.innerHTML = `
+        <thead class="bg-slate-50 text-slate-500 sticky top-0">
+          <tr>
+            <th class="text-left px-2 py-1">일자</th>
+            <th class="text-left px-2 py-1">본부</th>
+            <th class="text-left px-2 py-1">센터</th>
+            <th class="text-left px-2 py-1">매체</th>
+            <th class="text-right px-2 py-1">금액</th>
+          </tr>
+        </thead><tbody>${rows.slice(0, 80).map(r => `
+          <tr class="border-t border-slate-100">
+            <td class="px-2 py-1 text-xs">${r.date}</td>
+            <td class="px-2 py-1 text-xs">${r.hq || '—'}</td>
+            <td class="px-2 py-1 text-xs">${r.center || '—'}</td>
+            <td class="px-2 py-1 text-xs">${r.mediaType || '—'}</td>
+            <td class="px-2 py-1 text-right text-xs font-medium">${fmt.money(r.amount)}</td>
+          </tr>`).join('')}</tbody>`;
+    }
   }
 
   /** state.service 에 맞는 신규콜 수치 선택 (백엔드는 hq/center만 필터, service는 byService에서 선택). */
@@ -609,15 +701,20 @@
     return 0;
   }
 
-  /** 본부/센터 필터 변경 시 신규콜만 가볍게 재조회 (전체 loadAll 안 함). */
+  /** 본부/센터 필터 변경 시 신규콜 + 오프라인을 가볍게 재조회. */
   function loadLeads() {
     const q = buildDateQuery();
-    const leadQ = q
+    const filterQ = q
       + (state.hq !== 'all' ? `&hq=${encodeURIComponent(state.hq)}` : '')
       + (state.center !== 'all' ? `&center=${encodeURIComponent(state.center)}` : '');
-    return fetchJson(`/api/leads/by-category?${leadQ}`)
-      .then(d => { state.leadData = d; renderAllSafe(); })
-      .catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); });
+    return Promise.all([
+      fetchJson(`/api/leads/by-category?${filterQ}`)
+        .then(d => { state.leadData = d; renderAllSafe(); })
+        .catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); }),
+      fetchJson(`/api/offline/by-category?${filterQ}`)
+        .then(d => { state.offlineData = d; renderAllSafe(); })
+        .catch(() => { state.offlineData = { totalAmount:0, totalCount:0, byMedia:{}, byHq:{}, byCenter:{}, byDate:{}, rows:[] }; renderAllSafe(); })
+    ]);
   }
 
   function renderAllSafe() {
@@ -628,6 +725,7 @@
       renderTrendOverall();
       renderTrendByHq();
       renderPlatform();
+      renderOffline();
     } catch (e) {
       console.error('render error', e);
     }
