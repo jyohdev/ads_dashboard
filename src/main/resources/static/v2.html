@@ -1191,17 +1191,28 @@
     function card(kind, cost, cpa) {
       const isOnline = kind === 'online';
       const tone = isOnline ? '#EF6079' : '#5BA8A0';
-      const bg   = isOnline ? '#FEF1F4' : '#ECF5F3';
       const title = isOnline ? '온라인 광고' : '오프라인 광고';
       const isWinner = winner === kind;
+      const isLoser  = winner != null && !isWinner;
+
+      // 우위: 채도 진하게 + 굵은 보더 + 살짝 그림자
+      // 비우위: 흐릿하게 (opacity 살짝 + 회색톤)
+      const bg   = isWinner ? (isOnline ? '#FEE2E8' : '#D7EBE7')
+                            : (isOnline ? '#FEF6F8' : '#F1F8F6');
+      const border = isWinner ? `2px solid ${tone}` : `1px solid ${tone}22`;
+      const shadow = isWinner ? `box-shadow: 0 4px 14px ${tone}33;` : '';
+      const opacity = isLoser ? 'opacity:0.6;' : '';
+      const titleSize = isWinner ? 'text-base font-extrabold' : 'text-sm font-semibold';
+      const cpaSize = isWinner ? 'text-2xl font-extrabold' : 'text-lg font-bold';
+
       const winBadge = isWinner
-        ? `<span class="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full" style="background:${tone};color:#fff">CPA 우위</span>`
+        ? `<span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${tone};color:#fff;letter-spacing:0.5px">★ CPA 우위</span>`
         : '';
       const cpaStr = cpa == null ? '—' : fmt.money(Math.round(cpa));
       return `
-        <div class="p-4 rounded-xl" style="background:${bg};border:1px solid ${tone}33">
+        <div class="p-4 rounded-xl" style="background:${bg};border:${border};${shadow}${opacity}transition:all 0.2s">
           <div class="flex items-center mb-3">
-            <span class="text-sm font-semibold" style="color:${tone}">${title}</span>${winBadge}
+            <span class="${titleSize}" style="color:${tone}">${title}</span>${winBadge}
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
@@ -1214,7 +1225,7 @@
             </div>
             <div>
               <p class="text-[11px] text-slate-500">CPA (1콜당)</p>
-              <p class="text-lg font-bold" style="color:${tone}">${cpaStr}</p>
+              <p class="${cpaSize}" style="color:${tone}">${cpaStr}</p>
             </div>
           </div>
         </div>
@@ -1255,7 +1266,11 @@
     const valid = series.map(v => (v == null || isNaN(v)) ? null : Math.round(v));
 
     if (!valid.some(v => v != null && v > 0)) {
-      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400 text-center">해당 스코프의 CAC 데이터가 없습니다<br/><span class="text-[10px]">시트에 집계가 없는 본부/센터일 수 있어요</span></div>';
+      const noBackend = !data.months || data.months.length === 0;
+      const msg = noBackend
+        ? 'CAC API 응답이 비어있어요<br/><span class="text-[10px]">서버 재시작이 필요하거나 시트 공유 권한이 빠졌을 수 있어요</span>'
+        : `${label} 의 CAC 데이터가 시트에 없습니다<br/><span class="text-[10px]">시트의 본부/센터 이름이 대시보드와 다를 수 있어요</span>`;
+      host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-400 text-center">${msg}</div>`;
       return;
     }
     host.innerHTML = '';
