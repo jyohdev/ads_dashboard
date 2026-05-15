@@ -19,6 +19,16 @@ spring:
 app:
   allowed-email-domain: ${ALLOWED_EMAIL_DOMAIN:caring.co.kr}
 
+lead:
+  # CSV fallback (sheet 미설정 시)
+  csv-path: ${LEAD_CSV_PATH:data/leads.csv}
+  # Google Sheets (서비스 계정)
+  sheet-id: ${LEAD_SHEET_ID:}
+  sheet-range: ${LEAD_SHEET_RANGE:A:Z}
+  # 둘 중 하나만 채우면 됨. Path가 운영(Render)에선 불편하므로 KEY(JSON 통째로) 권장.
+  service-account-key: ${GOOGLE_SERVICE_ACCOUNT_KEY:}
+  service-account-key-path: ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH:}
+
 management:
   endpoints:
     web:

@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  * 파일 없으면 빈 리스트 반환 (에러 X).
  */
 @Component
-public class LeadCsvFetcher {
+public class LeadCsvFetcher implements LeadFetcher {
 
   private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
       DateTimeFormatter.ofPattern("yyyy-MM-dd"),
@@ -36,6 +36,7 @@ public class LeadCsvFetcher {
     this.props = props;
   }
 
+  @Override
   public List<LeadEntry> fetchAll() {
     Path path = Paths.get(props.csvPath());
     if (!Files.exists(path)) return List.of();

@@ -11,15 +11,24 @@ import org.springframework.stereotype.Service;
 @Service
 public class LeadService {
 
-  private final LeadCsvFetcher fetcher;
+  private final LeadSheetFetcher sheet;
+  private final LeadCsvFetcher csv;
+  private final LeadProperties props;
 
-  public LeadService(LeadCsvFetcher fetcher) {
-    this.fetcher = fetcher;
+  public LeadService(LeadSheetFetcher sheet, LeadCsvFetcher csv, LeadProperties props) {
+    this.sheet = sheet;
+    this.csv = csv;
+    this.props = props;
   }
 
   @Cacheable(cacheNames = "leads", key = "'all'")
   public List<LeadEntry> all() {
-    return fetcher.fetchAll();
+    // 시트 설정돼있으면 시트 우선, 실패/empty면 CSV fallback.
+    if (props.isSheetConfigured()) {
+      List<LeadEntry> rows = sheet.fetchAll();
+      if (!rows.isEmpty()) return rows;
+    }
+    return csv.fetchAll();
   }
 
   /** 기간 + (옵션) 본부/센터 필터 적용한 신규콜 집계. */

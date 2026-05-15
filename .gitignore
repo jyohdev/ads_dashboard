@@ -44,3 +44,5 @@ out/
 .env.local
 
 data/leads.csv
+data/service-account.json
+data/*.json
