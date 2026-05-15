@@ -446,6 +446,41 @@
 
   const state = { datePreset:'this_month', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null };
 
+  // ApexCharts 전역 — 애니메이션 끄고 폰트 통일 (렌더 ~3-5배 빨라짐)
+  if (typeof Apex !== 'undefined') {
+    Apex.chart = { animations: { enabled: false }, fontFamily: 'inherit', toolbar: { show: false } };
+  }
+
+  // 메모이제이션 — getAllCampaigns/getFilteredCampaigns 재계산 방지
+  const _memo = { allKey:null, all:null, filtKey:null, filt:null, cls:new Map(), c2hq:new Map(), norm:new Map() };
+  function _allKey() {
+    return (state.naverData ? 'n'+(state.naverData.rows?.length||0) : 'n0')
+         + (state.metaCampaigns ? 'm'+(state.metaCampaigns.data?.length||0) : 'm0')
+         + (state.googleCampaigns ? 'g'+(state.googleCampaigns.results?.length||0) : 'g0');
+  }
+  function _classifyByNameC(n) {
+    if (_memo.cls.has(n)) return _memo.cls.get(n);
+    const v = classifyByName(n); _memo.cls.set(n, v); return v;
+  }
+  function _centerToHqC(c) {
+    if (!c) return null;
+    if (_memo.c2hq.has(c)) return _memo.c2hq.get(c);
+    const v = centerToHq(c); _memo.c2hq.set(c, v); return v;
+  }
+  function _normCenterC(c) {
+    if (!c) return c;
+    if (_memo.norm.has(c)) return _memo.norm.get(c);
+    const v = normalizeCenterName(c); _memo.norm.set(c, v); return v;
+  }
+
+  // renderAllSafe 디바운스 — rAF 한 프레임으로 여러 fetch 결과 합치기
+  let _renderPending = false;
+  function scheduleRender() {
+    if (_renderPending) return;
+    _renderPending = true;
+    requestAnimationFrame(() => { _renderPending = false; _memo.allKey=null; _memo.filtKey=null; renderAllSafe(); });
+  }
+
   function buildDateQuery() {
     if (state.datePreset === 'custom' && state.since && state.until) {
       return `datePreset=custom&since=${state.since}&until=${state.until}`;
@@ -537,13 +572,14 @@
 
   const SERVICE_LIST = ['본사','방문요양','주간보호','가족요양','요양보호사','장기요양등급'];
 
-  // 통합 캠페인 리스트 (Naver + Meta), 분류 메타 포함, 현재 필터(본부/센터) 적용 후 반환
-  /** 전체 캠페인 (필터 적용 전). 분류·hq 매핑 포함. */
+  /** 전체 캠페인 (필터 적용 전). 분류·hq 매핑 포함. 메모: 원시 데이터 변경 시까지 재사용. */
   function getAllCampaigns() {
+    const key = _allKey();
+    if (_memo.allKey === key && _memo.all) return _memo.all;
     const all = [];
     (state.naverData?.rows||[]).forEach(r => {
-      const cls = classifyByName(r.name);
-      const hq = cls.channel === '본사' ? '본사' : (centerToHq(cls.center) || null);
+      const cls = _classifyByNameC(r.name);
+      const hq = cls.channel === '본사' ? '본사' : (_centerToHqC(cls.center) || null);
       all.push({
         platform:'Naver', name:r.name, service:cls.service, channel:cls.channel, center:cls.center,
         hq, spend: Number(r.salesAmt||0), conversions: Number(r.ccnt||0),
@@ -551,8 +587,8 @@
       });
     });
     (state.metaCampaigns?.data||[]).forEach(c => {
-      const cls = classifyByName(c.campaign_name);
-      const hq = cls.channel === '본사' ? '본사' : (centerToHq(cls.center) || null);
+      const cls = _classifyByNameC(c.campaign_name);
+      const hq = cls.channel === '본사' ? '본사' : (_centerToHqC(cls.center) || null);
       const conv = (c.actions||[]).filter(a=>a.action_type==='offsite_conversion.fb_pixel_custom').reduce((s,a)=>s+Number(a.value||0),0);
       all.push({
         platform:'Meta', name:c.campaign_name, service:cls.service, channel:cls.channel, center:cls.center,
@@ -565,36 +601,36 @@
       const m = r.metrics || {};
       const spend = Number(m.costMicros || 0) / 1e6;
       if (spend === 0 && Number(m.impressions || 0) === 0) return;
-      const cls = classifyByName(name);
-      const hq = cls.channel === '본사' ? '본사' : (centerToHq(cls.center) || null);
+      const cls = _classifyByNameC(name);
+      const hq = cls.channel === '본사' ? '본사' : (_centerToHqC(cls.center) || null);
       all.push({
         platform:'Google', name, service:cls.service, channel:cls.channel, center:cls.center,
         hq, spend, conversions: Number(m.conversions || 0),
         clicks: Number(m.clicks || 0), impressions: Number(m.impressions || 0)
       });
     });
+    _memo.allKey = key; _memo.all = all;
     return all;
   }
 
   function getFilteredCampaigns() {
-    return getAllCampaigns().filter(c => {
+    const key = _allKey() + '|' + state.service + '|' + state.hq + '|' + state.center;
+    if (_memo.filtKey === key && _memo.filt) return _memo.filt;
+    const filtered = getAllCampaigns().filter(c => {
       if (state.service !== 'all') {
-        // 본사 탭은 channel=본사 기준 — 캠페인명에 "본사" 들어간 모든 캠페인
-        // (방문요양·주간보호·가족요양·요양보호사·장기요양등급 본사 캠페인 다 포함)
         if (state.service === '본사') {
           if (c.channel !== '본사') return false;
-        } else {
-          if (c.service !== state.service) return false;
-        }
+        } else if (c.service !== state.service) return false;
       }
       if (state.hq !== 'all' && c.hq !== state.hq) return false;
       if (state.center !== 'all') {
         const raw = c.center;
-        const norm = normalizeCenterName(raw);
-        if (raw !== state.center && norm !== state.center) return false;
+        if (raw !== state.center && _normCenterC(raw) !== state.center) return false;
       }
       return true;
     });
+    _memo.filtKey = key; _memo.filt = filtered;
+    return filtered;
   }
 
   function aggregateByService() {
@@ -638,13 +674,13 @@
     renderAllSafe();
 
     const tasks = [
-      fetchJson(`/api/meta/insights?${q}`).then(d => { state.metaData = d; renderAllSafe(); }).catch(e => console.error('meta', e)),
-      fetchJson(`/api/meta/insights/campaigns?${q}`).then(d => { state.metaCampaigns = d; renderAllSafe(); }).catch(e => console.error('metaCamps', e)),
-      fetchJson(`/api/google/insights/campaigns?${q}`).then(d => { state.googleCampaigns = d; renderAllSafe(); }).catch(e => { console.error('google', e); state.googleCampaigns = { results: [] }; renderAllSafe(); }),
-      fetchJson(`/api/leads/by-category?${leadQ}`).then(d => { state.leadData = d; renderAllSafe(); }).catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); }),
-      fetchJson(`/api/offline/by-category?${leadQ}`).then(d => { state.offlineData = d; renderAllSafe(); }).catch(() => { state.offlineData = { totalAmount:0, totalCount:0, byMedia:{}, byHq:{}, byCenter:{}, byDate:{}, rows:[] }; renderAllSafe(); }),
-      // Naver는 7개 계정 직렬 호출이라 가장 느림 — 마지막에 채워짐
-      fetchJson(`/api/naver/insights/by-category?${q}`).then(d => { state.naverData = d; renderAllSafe(); }).catch(e => console.error('naver', e)),
+      fetchJson(`/api/meta/insights?${q}`).then(d => { state.metaData = d; scheduleRender(); }).catch(e => console.error('meta', e)),
+      fetchJson(`/api/meta/insights/campaigns?${q}`).then(d => { state.metaCampaigns = d; scheduleRender(); }).catch(e => console.error('metaCamps', e)),
+      fetchJson(`/api/google/insights/campaigns?${q}`).then(d => { state.googleCampaigns = d; scheduleRender(); }).catch(e => { console.error('google', e); state.googleCampaigns = { results: [] }; scheduleRender(); }),
+      fetchJson(`/api/leads/by-category?${leadQ}`).then(d => { state.leadData = d; scheduleRender(); }).catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; scheduleRender(); }),
+      fetchJson(`/api/offline/by-category?${leadQ}`).then(d => { state.offlineData = d; scheduleRender(); }).catch(() => { state.offlineData = { totalAmount:0, totalCount:0, byMedia:{}, byHq:{}, byCenter:{}, byDate:{}, rows:[] }; scheduleRender(); }),
+      // Naver는 7개 계정 병렬 호출 (백엔드 parallelStream) — 그래도 가장 느린 편
+      fetchJson(`/api/naver/insights/by-category?${q}`).then(d => { state.naverData = d; scheduleRender(); }).catch(e => console.error('naver', e)),
     ];
 
     Promise.allSettled(tasks).then(() => {
@@ -672,7 +708,7 @@
     } else {
       host.innerHTML = '';
       state.charts.offlineMedia = new ApexCharts(host, {
-        chart: { type:'bar', height:280, toolbar:{show:false} },
+        chart: { type:'bar', height:280, toolbar:{show:false}, animations:{enabled:false} },
         series: [{ name:'비용', data: mediaEntries.map(([_,v]) => v) }],
         xaxis: { categories: mediaEntries.map(([k,_]) => k), labels: { style: { fontSize: '11px' } } },
         plotOptions: { bar: { horizontal:true, borderRadius:5, distributed:true } },
@@ -727,11 +763,11 @@
       + (state.center !== 'all' ? `&center=${encodeURIComponent(state.center)}` : '');
     return Promise.all([
       fetchJson(`/api/leads/by-category?${filterQ}`)
-        .then(d => { state.leadData = d; renderAllSafe(); })
-        .catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); }),
+        .then(d => { state.leadData = d; scheduleRender(); })
+        .catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; scheduleRender(); }),
       fetchJson(`/api/offline/by-category?${filterQ}`)
-        .then(d => { state.offlineData = d; renderAllSafe(); })
-        .catch(() => { state.offlineData = { totalAmount:0, totalCount:0, byMedia:{}, byHq:{}, byCenter:{}, byDate:{}, rows:[] }; renderAllSafe(); })
+        .then(d => { state.offlineData = d; scheduleRender(); })
+        .catch(() => { state.offlineData = { totalAmount:0, totalCount:0, byMedia:{}, byHq:{}, byCenter:{}, byDate:{}, rows:[] }; scheduleRender(); })
     ]);
   }
 
@@ -1075,7 +1111,7 @@
     }
     host.innerHTML = '';
     state.charts[chartKey] = new ApexCharts(host, {
-      chart: { type: 'donut', height: 300 },
+      chart: { type: 'donut', height: 300, animations:{enabled:false} },
       series: [Math.round(online), Math.round(offline)],
       labels: ['온라인 광고비', '오프라인 광고비'],
       colors: ['#EF6079', '#5BA8A0'],
@@ -1098,7 +1134,7 @@
     const leadByHq = state.leadData?.byHq || {};
     const newCallsByHq = HQ_LIST.map(h => Number(leadByHq[h] || 0));
     const opts = {
-      chart: { type: 'line', height: 300, toolbar: { show: false }, stacked: false },
+      chart: { type: 'line', height: 300, toolbar: { show: false }, stacked: false, animations:{enabled:false} },
       series: [
         { name: '전화클릭', type: 'column', data: HQ_LIST.map(h => buckets[h].conversions||0) },
         { name: '신규콜', type: 'column', data: newCallsByHq },
@@ -1169,7 +1205,7 @@
         barColors = [platColor];
       }
       const opts = {
-        chart: { type:'bar', height:280, toolbar:{show:false} },
+        chart: { type:'bar', height:280, toolbar:{show:false}, animations:{enabled:false} },
         series: [{ name:'지출', data: top.map(c => Math.round(c.spend)) }],
         xaxis: { categories: top.map(c => (c.name||'').slice(0,28)), labels: { style: { fontSize: '10px' } } },
         plotOptions: { bar: { horizontal:true, borderRadius:5, distributed: p==='all', columnWidth: '70%' } },

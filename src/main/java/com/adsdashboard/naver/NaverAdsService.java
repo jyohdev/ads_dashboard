@@ -178,18 +178,26 @@ public class NaverAdsService {
   private Map<String, Object> fetchCampaignInsightsRaw(String datePreset, String since, String until) {
     DateSpec spec = resolveDateSpec(datePreset, since, until);
     List<NaverAccount> active = props.activeAccounts();
+    // 7개 계정 병렬 호출 — 가장 큰 perf 병목이었음
+    List<CompletableFuture<AccountResult>> futures = active.stream()
+        .map(acc -> CompletableFuture.supplyAsync(() -> {
+          try {
+            return new AccountResult(fetchCampaignStats(acc, spec), null);
+          } catch (RuntimeException e) {
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("account", acc.name());
+            err.put("customerId", acc.customerId());
+            err.put("error", e.getMessage());
+            return new AccountResult(List.of(), err);
+          }
+        }))
+        .toList();
     List<Map<String, Object>> rows = new ArrayList<>();
     List<Map<String, Object>> errors = new ArrayList<>();
-    for (NaverAccount acc : active) {
-      try {
-        rows.addAll(fetchCampaignStats(acc, spec));
-      } catch (RuntimeException e) {
-        Map<String, Object> err = new LinkedHashMap<>();
-        err.put("account", acc.name());
-        err.put("customerId", acc.customerId());
-        err.put("error", e.getMessage());
-        errors.add(err);
-      }
+    for (CompletableFuture<AccountResult> f : futures) {
+      AccountResult r = f.join();
+      rows.addAll(r.rows);
+      if (r.error != null) errors.add(r.error);
     }
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("stats", rows);
@@ -198,6 +206,8 @@ public class NaverAdsService {
     result.put("accountErrors", errors);
     return result;
   }
+
+  private record AccountResult(List<Map<String, Object>> rows, Map<String, Object> error) {}
 
   private static List<Map<String, Object>> sortedCenterList(Map<String, Aggregate> centerMap) {
     if (centerMap == null) return List.of();
