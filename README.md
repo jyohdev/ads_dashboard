@@ -2,157 +2,168 @@
 
 흩어져 있는 광고/마케팅 데이터 파이프라인을 한 화면으로 잇는 통합 대시보드.
 
-- **온라인 광고** (Meta · Google Ads · 네이버 검색광고)
-- **오프라인 광고** (전단지 · OOH · 라디오/TV · 옥외 등 — 매체비/노출 추정 수기 입력)
-- **퍼널 추적**: 노출 → 클릭/접촉 → 문의 → 신규 유입 → 수급자
-- **전국 센터(지점)별** 성과 분해
-
-**스택**: Spring Boot 3.5 · Java 17 · Gradle · Tailwind(CDN) · ApexCharts(CDN) · Caffeine
+- **온라인 광고**: Meta · Google Ads · 네이버 검색광고 (3개 매체 통합)
+- **신규콜 데이터**: Google Sheets 연동
+- **본부/센터/서비스 분류**: 캠페인명 파싱으로 자동 매핑
+- **사내 SSO**: Google OAuth, `@caring.co.kr` 도메인만 접근
 
 ---
 
-## 구현 현황
+## 스택
 
-### ✅ 구현 완료
-
-#### 백엔드
-- Spring Boot 3.5 + Java 17 프로젝트 베이스
-- Meta Marketing API 연동 (System User 영구 토큰 기반)
-  - 계정 인사이트 (`/api/meta/insights`)
-  - 일별 인사이트 (`/api/meta/insights/daily`, `time_increment=1`)
-  - 캠페인별 인사이트 (`/api/meta/insights/campaigns`, `level=campaign`)
-  - 캠페인 목록 (`/api/meta/campaigns`)
-- `text/javascript` 응답 파서 (Meta Graph API quirk 대응)
-- 글로벌 예외 핸들러 (Meta API 에러 / 일반 에러를 JSON으로 반환)
-- Caffeine 인메모리 캐시 60초 TTL — Meta API 호출 절감
-- Spring Boot Actuator 헬스체크 (`/actuator/health`)
-
-#### 프론트엔드 (정적 SPA, `/`)
-- KPI 카드 7종: 총 지출 / 노출 / 클릭 / **문의(전환)** / CTR / CPC / **CPL**
-- 일별 추이 차트 — 지출(막대) + 링크클릭(라인)
-- 캠페인별 지출 가로 막대 차트 (상위 10개)
-- 캠페인 목록 테이블 (지출순 정렬, 상태 색상 표시)
-- 날짜 필터 (오늘 / 어제 / 7일 / 30일 / 이번 달 / 지난 달)
-- 5분 자동 폴링 + 수동 새로고침 버튼
-- 문의 집계: `actions[]` 의 `action_type=lead` 합산
-
-#### 인프라
-- 멀티스테이지 Dockerfile (Temurin 17, JVM `-Xmx256m`)
-- `render.yaml` Blueprint (Render Free 플랜)
-- 코드 컨벤션: Google Java Style (2-space, 100-col)
+| Layer | Tech |
+|---|---|
+| Runtime | Java 17 · Spring Boot 3.5 · Gradle |
+| Web | Spring MVC · Spring Security (OAuth2 Client) |
+| Cache | Caffeine (5분 TTL) |
+| API 클라이언트 | Spring `RestClient` (Meta · Google Ads · Naver), Google Sheets API SDK |
+| Frontend | Static HTML · Tailwind (CDN) · ApexCharts (CDN) |
+| Infra | Docker (멀티스테이지) · Render Blueprint |
 
 ---
 
-### 🚧 구현 예정
+## 아키텍처 개요
 
-#### 광고 플랫폼 추가
-- **Google Ads API 연동**
-  - OAuth 2.0 + Developer Token 발급
-  - `google-ads-java` SDK 도입
-  - GAQL 쿼리로 캠페인 / 그룹 / 키워드 지표 조회
-- **네이버 검색광고 API 연동**
-  - API Key + Secret + Customer ID 기반 HMAC-SHA256 시그니처 직접 구현
-  - 캠페인 / 광고그룹 / 키워드 지표
+```
+Browser
+  ├─ /login.html ──[Google OAuth + 도메인체크]── 인증
+  └─ /v2.html  (단일 SPA)
+        │
+        └─ 병렬 fetch (progressive rendering)
+              ├─ /api/meta/*       (Meta Graph API)
+              ├─ /api/google/*     (Google Ads API v20, GAQL)
+              ├─ /api/naver/*      (Naver SearchAd API, 7개 계정 병렬)
+              └─ /api/leads/*      (Google Sheets API, 서비스 계정)
+```
 
-#### 비즈니스 지표 확장 (퍼널 추적)
-- **신규 유입** 카운트 — 문의 이후 단계 (CRM/내부 시스템 데이터 연동 또는 수동 입력)
-- **수급자 전환** — 신규 유입 중 실제 수급자로 전환된 수
-- 퍼널 시각화: 노출 → 클릭 → 문의 → 신규 유입 → 수급자
-- 단계별 전환율 (CVR) 및 단계당 비용 (CPA) 계산
-- **끊어진 데이터 파이프라인 보완**: 광고 플랫폼별/온오프라인/CRM이 분리돼서 발생하는 사각지대를
-  하나의 화면에서 합산·비교
+각 매체 호출 결과는 Caffeine 캐시(5분)로 묶여 중복 호출을 막습니다. Naver는 7개 광고주 계정을 `parallelStream`으로 동시에 가져옵니다.
 
-#### 온·오프라인 통합
-- **오프라인 광고** 데이터 입력/관리 — 전단지, OOH, 라디오, TV, 옥외, 행사 등
-  - 수기 입력 폼 (매체명, 기간, 비용, 추정 노출/도달)
-  - 오프라인 → 문의 매칭 (전화 추적번호 / QR / 쿠폰 코드 / 유입 채널 응답)
-- 온·오프라인 통합 KPI 비교 (CPA / CPL / ROAS)
+---
 
-#### 조직 단위별 분해
-3개의 큰 분류로 지표를 나눠서 볼 수 있어야 함:
+## 본부 / 센터 / 서비스 매핑
 
-1. **본사** — 케어링 본사 차원의 브랜드/통합 캠페인
-2. **센터 — 주간보호** — 전국 주간보호 센터들 (지점별 추가 필터)
-3. **센터 — 통합요양** — 전국 통합요양 센터들 (지점별 추가 필터)
+캠페인 데이터는 매체마다 raw 형식이지만, 대시보드 차원에선 **본부 / 센터 / 서비스(방문요양·주간보호·가족요양·요양보호사·장기요양등급·본사)** 로 분류해서 비교해야 합니다.
 
-- 분류별 KPI (지출, 문의, CPL, 신규 유입, 수급자) 동시 비교
-- 센터(2/3) 안에서는 지점 단위(안산점, 광주첨단점 등)로 추가 필터
-- 지도 시각화 (지점별 성과 히트맵) 검토
-- 매핑 방식:
-  - 1차: 캠페인명 파싱 (현재 네이밍 `본부_트래픽_{분류}_{지점}_숫자` 활용)
-  - 2차: 매핑 안 되는 캠페인은 별도 매핑 테이블에 수동 등록
+매핑은 모두 프런트(`v2.html`)에서 캠페인명 파싱으로 처리합니다.
 
-#### 대시보드 UX
-- 플랫폼 탭 (Meta / Google / Naver / 오프라인 / 통합)
-- 조직 분류 필터: **본사 / 주간보호 / 통합요양** (3개) → 센터 안에서는 지점별 필터
-- 캠페인별 상세 페이지 (광고세트 → 광고 단위 드릴다운)
-- CSV / Excel 내보내기
-- 사용자 지정 날짜 범위 (datepicker)
-- 로그인 / 사용자별 권한 (현재는 익명)
+### 본부 목록
 
-#### 운영
-- Render 프로덕션 배포
-- 모니터링 / 에러 추적 (Sentry 또는 Spring Actuator + Prometheus)
-- DB 도입 검토 — 현재는 매번 Meta API 호출, 장기 적재가 필요해지면 Postgres + 적재 배치
+`본사 · 수도권1본부 · 수도권2본부 · 수도권3본부 · 영남본부 · 충청본부 · 호남본부`
+
+### 서비스 분류 (`classifyByName`)
+
+캠페인명에서 다음 키워드를 우선순위로 검사:
+
+1. **강한 키워드** — `방문요양|방요`, `주간보호|주보`, `가족요양`, `요양보호사|요보사`, `장기요양등급`
+2. **브랜드검색** → `본사` 서비스
+3. **#02 / #03 / #04 / #05 prefix** → 각각 방문요양 / 주간보호 / 가족요양 / 요양보호사 (서비스 키워드 없는 플레이스 캠페인용)
+4. **본사 키워드** fallback → `본사`
+5. 매치 없음 → `기타`
+
+### 채널 분류
+
+- 캠페인명에 `본사` 키워드 포함 → `본사` 채널 (HQ 캠페인)
+- 그 외 → `센터` 채널
+
+### 센터 추출 (`pickStrongCenter`)
+
+캠페인명 토큰화 후 다음 우선순위로 센터 추출:
+
+1. **신형식 `##_<HQ>_<center>_<service>_...`** — 언더스코어 분할, 인덱스 1이 HQ_LIST에 있으면 인덱스 2를 센터로 채택
+2. `~점` 으로 끝나는 토큰 (예: `부천점`, `광주남구점`)
+3. `~센터` 토큰
+4. `~본부` / `~통합` / `~공통` 토큰
+5. **멀티토큰 합성** — `통합`/`공통`이 단독으로 나오면 직전 토큰과 결합 (예: `## 창원 통합` → `창원통합`)
+6. 단독 suffix 토큰(`본부`, `센터`, `통합`, `공통`, `점`, `본사`)은 센터로 채택 안 함
+
+### 센터 → 본부 매핑 (`centerToHq`)
+
+1. **공식 명 직접 매칭**: `HQ_CENTERS[hq]` 리스트에서 그대로 찾기 (예: `부천점` → `수도권2본부`)
+2. **별칭 매핑**: `CENTER_ALIAS` (광고 데이터 표기가 공식 명과 다른 경우 — 예: `광주통합`, `서울영등포점`, `(구)고은센터` 등)
+3. **정규화 후 재시도**: `CENTER_NORMALIZE` 로 표준 명으로 바꾼 뒤 다시 1·2 시도 (예: `양천구` → `서울양천점` → `수도권3본부`)
+
+---
+
+## 광고 매체별 연동 방식
+
+| 매체 | 방식 | 비고 |
+|---|---|---|
+| Meta | System User 영구 토큰 + Graph API v21.0 | `actions[]` 에서 `lead`, `offsite_conversion.fb_pixel_custom` 합산 |
+| Google Ads | OAuth Refresh Token + Developer Token, GAQL v20 | `metrics.cost_micros` ÷ 10^6 = ₩, `metrics.conversions` = 전환수 (전화클릭 외 포함) |
+| Naver SearchAd | HMAC-SHA256 직접 시그니처 (7개 계정 병렬) | 일별 비동기 리포트는 미연동 (계정합 데이터만 제공) |
+| 신규콜 (Sheets) | 서비스 계정 + Sheets API v4 | URL의 `gid=N` 자동 파싱 → 탭 이름 lookup |
+
+자격증명(토큰/키 등)은 `.env`에 분리. 템플릿은 [`.env.example`](.env.example) 참고.
+
+---
+
+## 로그인
+
+- 로그인 전 모든 경로는 `/login.html` 로 리다이렉트 (`/actuator/health` 와 정적 로그인 페이지 제외)
+- Google OAuth (`/oauth2/authorization/google`) 로 인증
+- 2중 차단:
+  1. GCP OAuth 동의 화면 **Internal** 설정 — caring.co.kr Workspace 계정만 로그인 가능
+  2. 앱단 OIDC userService에서 이메일 `endsWith("@" + allowedDomain)` 검증
+- 허용 도메인은 환경변수 `ALLOWED_EMAIL_DOMAIN`으로 변경 가능
 
 ---
 
 ## 로컬 실행
 
 ```bash
-# 환경변수 설정 (한 번만)
-export META_ACCESS_TOKEN='시스템_사용자_영구_토큰'
-export META_AD_ACCOUNT_ID='1234567890'   # act_ 접두사 제외, 숫자만
-export META_API_VERSION=v21.0            # 선택, 기본값 v21.0
+# 1) 환경변수 파일 준비
+cp .env.example .env
+# .env 를 열어서 필요한 매체의 자격증명만 채워넣기
+# (안 채운 매체는 빈 응답을 반환하므로 그 매체 패널만 비어보임)
 
-# 실행
-./gradlew bootRun
+# 2) 신규콜 시트 쓸 거면 서비스 계정 JSON 키를 data/service-account.json 으로 저장
+#    (GCP IAM → 서비스 계정 → 키 → 새 키 만들기 → JSON)
+#    + 대상 시트(들)를 그 서비스 계정 이메일에 "뷰어"로 공유
+
+# 3) 실행
+set -a && source .env && set +a && ./gradlew bootRun
 ```
 
-브라우저에서 [http://localhost:8080/](http://localhost:8080/) 접속.
+브라우저: <http://localhost:8080/> → 로그인 → 대시보드(`/v2.html`)
 
 ---
 
 ## API 엔드포인트
 
-`datePreset` 값: `today`, `yesterday`, `last_7d`, `last_30d`, `this_month`, `last_month`, `lifetime` 등.
+모두 인증 필요(`/actuator/health` 제외). `datePreset` 값: `today`, `yesterday`, `last_7d`, `last_14d`, `last_30d`, `this_month`, `last_month`, `custom` (custom 일 때 `since=YYYY-MM-DD&until=YYYY-MM-DD` 추가).
 
+### Meta
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/meta/insights?datePreset=last_7d` | 광고 계정 합계 인사이트 |
-| GET | `/api/meta/insights/daily?datePreset=last_7d` | 일별 분해 (`time_increment=1`) |
-| GET | `/api/meta/insights/campaigns?datePreset=last_7d` | 캠페인별 분해 (`level=campaign`) |
-| GET | `/api/meta/campaigns` | 캠페인 목록 (이름/상태/예산) |
-| GET | `/actuator/health` | 헬스체크 |
+| GET | `/api/meta/insights?datePreset=...` | 광고 계정 합계 |
+| GET | `/api/meta/insights/daily?datePreset=...` | 일별 (`time_increment=1`) |
+| GET | `/api/meta/insights/campaigns?datePreset=...` | 캠페인별 (`level=campaign`) |
+| GET | `/api/meta/campaigns` | 캠페인 목록 |
 
----
+### Google Ads
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/google/insights?datePreset=...` | 계정 합계 |
+| GET | `/api/google/insights/daily?datePreset=...` | 일별 |
+| GET | `/api/google/insights/campaigns?datePreset=...` | 캠페인별 |
+| GET | `/api/google/campaigns` | 캠페인 메타 (상태/유형/예산) |
 
-## Meta 자격증명 발급
+### Naver
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/naver/insights?datePreset=...` | 7개 계정 합계 |
+| GET | `/api/naver/insights/by-category?datePreset=...` | 서비스/채널/센터 분류 후 캠페인 단위 |
+| GET | `/api/naver/campaigns` | 캠페인 목록 |
 
-1. [Meta for Developers](https://developers.facebook.com/apps/) 에서 앱 생성 (앱 유형: Business)
-2. **이용 사례** → 권한 추가 (`ads_read`, `ads_management`, `business_management`)
-3. [비즈니스 관리자](https://business.facebook.com) → 비즈니스 설정 → **사용자 → 시스템 사용자** 생성
-4. 시스템 사용자에 광고 계정 + 앱 자산 추가 (역할: 관리자)
-5. 시스템 사용자 → **토큰 생성** (만료: 영구, 권한: `ads_read` + `ads_management`)
-6. 광고 계정 ID는 비즈니스 설정 → 계정 → 광고 계정에서 확인 (`act_` 접두사 제외)
+### 신규콜
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/leads/by-category?datePreset=...&hq=&center=` | 본부/센터/서비스/일자별 집계 |
 
-> ⚠️ 토큰은 영구이므로 노출 시 즉시 폐기 + 재발급. `.env` 파일은 `.gitignore` 처리됨.
-
----
-
-## Render 배포
-
-1. GitHub 리포가 push 되어 있어야 함
-2. [Render Dashboard](https://dashboard.render.com) → **New +** → **Blueprint**
-3. 리포 선택 — `render.yaml` 자동 감지
-4. 환경변수 입력
-   - `META_ACCESS_TOKEN`
-   - `META_AD_ACCOUNT_ID`
-   - `META_API_VERSION` (기본 `v21.0`)
-5. **Apply** 클릭 — 첫 빌드 5~10분
-
-> Render 무료 플랜은 15분 미사용 시 sleep, 다음 요청에서 30초~1분 cold start.
-> 메모리 한도 512MB이므로 JVM `-Xmx256m`으로 제한해두었음.
+### 헬스체크
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/actuator/health` | 인증 불필요 |
 
 ---
 
@@ -162,21 +173,76 @@ export META_API_VERSION=v21.0            # 선택, 기본값 v21.0
 src/main/java/com/adsdashboard/
 ├── AdsDashboardApplication.java
 ├── config/
-│   └── CacheConfig.java          Caffeine 캐시 설정
-└── meta/
-    ├── MetaProperties.java       자격증명 record (@ConfigurationProperties)
-    ├── MetaAdsClient.java        Graph API HTTP 호출 (RestClient)
-    ├── MetaAdsService.java       비즈니스 로직 + @Cacheable
-    └── MetaAdsController.java    REST 엔드포인트 + 예외 핸들러
+│   ├── CacheConfig.java              Caffeine 캐시 5분 TTL
+│   └── SecurityConfig.java           OAuth + 도메인 제한
+├── meta/                              Meta Marketing API
+│   ├── MetaProperties.java
+│   ├── MetaAdsClient.java
+│   ├── MetaAdsService.java
+│   └── MetaAdsController.java
+├── google/                            Google Ads API
+│   ├── GoogleProperties.java
+│   ├── GoogleAdsClient.java
+│   ├── GoogleAdsService.java
+│   └── GoogleAdsController.java
+├── naver/                             Naver SearchAd API
+│   ├── NaverProperties.java
+│   ├── NaverAdsClient.java
+│   ├── NaverClassifier.java          캠페인명 → 서비스/센터 분류 (서버사이드)
+│   ├── NaverAdsService.java
+│   └── NaverAdsController.java
+└── lead/                              신규콜 (CSV 또는 Google Sheets)
+    ├── LeadProperties.java
+    ├── LeadFetcher.java              인터페이스
+    ├── LeadCsvFetcher.java           로컬 CSV
+    ├── LeadSheetFetcher.java         Sheets API + 서비스 계정 (URL의 gid 자동 매핑)
+    ├── LeadService.java
+    └── LeadController.java
 
 src/main/resources/
-├── application.yml               PORT, META_* 환경변수 바인딩
+├── application.yml                    환경변수 바인딩
 └── static/
-    └── index.html                대시보드 SPA (Tailwind + ApexCharts)
+    ├── index.html                     /v2.html 로 redirect
+    ├── login.html                     Google 로그인 페이지
+    └── v2.html                        대시보드 SPA (KPI/카드/차트/매핑)
 
-Dockerfile                        멀티스테이지 빌드 (Render용)
-render.yaml                       Render Blueprint
+data/
+├── leads.example.csv                  CSV 포맷 샘플 (commit OK)
+├── leads.csv                          실데이터 (gitignored)
+└── service-account.json               GCP 서비스 계정 키 (gitignored)
+
+Dockerfile · render.yaml               배포
+.env.example                           환경변수 템플릿
+.env                                   실 자격증명 (gitignored)
 ```
+
+---
+
+## 캐싱 정책
+
+| 캐시 | TTL | 키 |
+|---|---|---|
+| `metaInsights` / `metaCampaigns` | 5분 | `datePreset` 별 |
+| `googleInsights` / `googleCampaigns` | 5분 | `datePreset` 별 |
+| `naverInsights` / `naverCampaigns` | 5분 | `datePreset` 별 |
+| `leads` | 5분 | 전체 (`'all'` 키) |
+
+운영에서 더 길게 가져갈 필요가 있으면 `CacheConfig.java` 의 `expireAfterWrite` 조정.
+
+---
+
+## Render 배포
+
+1. GitHub push 되어 있어야 함
+2. [Render Dashboard](https://dashboard.render.com) → **New +** → **Blueprint**
+3. 리포 선택 → `render.yaml` 자동 감지
+4. 환경변수 입력 (`.env` 와 동일한 키, 운영용 값)
+   - `META_*`, `GOOGLE_ADS_*`, `NAVER_ADS_*`, `LEAD_SHEET_*`
+   - `DASHBOARD_OAUTH_CLIENT_ID / _SECRET` (운영 도메인용 redirect URI를 GCP에 추가해둘 것)
+   - `GOOGLE_SERVICE_ACCOUNT_KEY` (JSON 통째로 paste)
+5. **Apply** → 첫 빌드 5~10분
+
+> Render 무료 플랜은 15분 미사용 시 sleep, 다음 요청 시 30초~1분 cold start.
 
 ---
 
