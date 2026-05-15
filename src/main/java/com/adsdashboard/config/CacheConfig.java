@@ -31,8 +31,8 @@ public class CacheConfig {
         NAVER_CAMPAIGNS_CACHE,
         LEADS_CACHE);
     manager.setCaffeine(Caffeine.newBuilder()
-        .expireAfterWrite(60, TimeUnit.SECONDS)
-        .maximumSize(100));
+        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .maximumSize(200));
     return manager;
   }
 }

@@ -97,7 +97,7 @@
       <div class="px-2 space-y-1.5 text-xs text-slate-500">
         <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Naver Ads · 7개</div>
         <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Meta Ads</div>
-        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> Google · 미연동</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-sky-400"></span> Google Ads</div>
         <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> 신규콜 시트</div>
       </div>
     </div>
@@ -249,7 +249,7 @@
     <div class="flex gap-2 mb-3 text-sm flex-wrap" id="platformTabs">
       <button class="tab-btn pill active" data-platform="all">매체종합</button>
       <button class="tab-btn pill" data-platform="naver">Naver</button>
-      <button class="tab-btn pill" data-platform="google">Google <span class="text-[10px] opacity-60 ml-1">scaffold</span></button>
+      <button class="tab-btn pill" data-platform="google">Google</button>
       <button class="tab-btn pill" data-platform="meta">Meta</button>
     </div>
 
@@ -334,6 +334,8 @@
     '강남센터': '수도권2본부',
     '서울성북점': '수도권2본부',
     '서울영등포점': '수도권2본부',
+    '서울강동점': '수도권2본부',
+    '서울구로점': '수도권2본부',
     '처인점': '수도권2본부',
     // 수도권3본부 (서초센터, 행정구 표기, (구) 시리즈, ~점 alias)
     '서초센터': '수도권3본부',
@@ -341,6 +343,7 @@
     '은평구': '수도권3본부',
     '도봉구': '수도권3본부',
     '양천구': '수도권3본부',
+    '양천점': '수도권3본부',
     '가온센터': '수도권3본부',
     '고은센터': '수도권3본부',
     '다솜센터': '수도권3본부',
@@ -362,8 +365,11 @@
     '군산점': '호남본부',
     '봄날점': '호남본부',
     '광주봄날점': '호남본부',
+    '광주봉날점': '호남본부',
+    '광주통합': '호남본부',
     '광주공통': '호남본부',
     '호남광주첨단점': '호남본부',
+    '호남센터': '호남본부',
     '호남본부': '호남본부',
   };
 
@@ -383,7 +389,13 @@
     short: n => { n = Number(n||0); if (n >= 1e8) return (n/1e8).toFixed(1)+'억'; if (n >= 1e4) return (n/1e4).toFixed(1)+'만'; return Math.round(n).toLocaleString(); }
   };
 
-  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, leadData:null };
+  function platformBadge(p) {
+    const key = (p||'').toLowerCase();
+    const c = PLATFORM_COLOR[key] || PLATFORM_COLOR.all;
+    return `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium" style="background:${c.soft};color:${c.text}">${p}</span>`;
+  }
+
+  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null };
 
   function buildDateQuery() {
     if (state.datePreset === 'custom' && state.since && state.until) {
@@ -401,7 +413,16 @@
       if ((HQ_CENTERS[hq]||[]).includes(centerName)) return hq;
     }
     // 2) alias (광고 API 추출명 → 본부)
-    return CENTER_ALIAS[centerName] || null;
+    if (CENTER_ALIAS[centerName]) return CENTER_ALIAS[centerName];
+    // 3) normalize 후 재시도 (예: 서울성북점 → 성북점 → 수도권2본부)
+    const norm = normalizeCenterName(centerName);
+    if (norm && norm !== centerName) {
+      for (const hq of HQ_LIST) {
+        if ((HQ_CENTERS[hq]||[]).includes(norm)) return hq;
+      }
+      if (CENTER_ALIAS[norm]) return CENTER_ALIAS[norm];
+    }
+    return null;
   }
 
   // 캠페인명 파싱. 우선순위: 방문요양 → 주간보호 → 가족요양 → 요양보호사 → 본사 → 기타
@@ -437,8 +458,15 @@
   }
 
   // ~점 → ~센터 → ~본부 → ~통합 → ~공통 우선순위. 단순 suffix 단독 토큰("본부","센터" 등)은 제외.
+  // 신형식 "##_<HQ>_<center>_<service>" 캠페인은 언더스코어 분할로 HQ/센터 직접 추출.
+  // 멀티토큰 합성: "광주 통합" 같이 "통합/공통"이 단독 토큰일 땐 이전 토큰과 결합 (→ "광주통합").
   function pickStrongCenter(name) {
     if (!name) return null;
+    // 0) 신형식: NN_HQ_<center>_<service>_... (e.g., "02_수도권2본부_부천점_방문요양_플레이스")
+    const us = name.split('_').map(s => s.trim()).filter(Boolean);
+    if (us.length >= 3 && /^\d{1,2}$/.test(us[0]) && HQ_LIST.includes(us[1])) {
+      return us[2];
+    }
     const tokens = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
     const exclude = new Set(['본부','센터','통합','공통','점','본사']);
     const checks = ['점','센터','본부','통합','공통'];
@@ -446,6 +474,13 @@
       for (let i = tokens.length - 1; i >= 0; i--) {
         const t = tokens[i];
         if (t.endsWith(suffix) && t.length > suffix.length && !exclude.has(t)) return t;
+      }
+    }
+    // 멀티토큰 합성 — "X 통합", "X 공통" 패턴 (예: "## 창원 통합 - #03" → "창원통합")
+    for (let i = tokens.length - 1; i >= 1; i--) {
+      if (tokens[i] === '통합' || tokens[i] === '공통') {
+        const prev = tokens[i-1];
+        if (prev && !exclude.has(prev)) return prev + tokens[i];
       }
     }
     return null;
@@ -473,6 +508,19 @@
         platform:'Meta', name:c.campaign_name, service:cls.service, channel:cls.channel, center:cls.center,
         hq, spend: Number(c.spend||0), conversions: conv,
         clicks: Number(c.clicks||0), impressions: Number(c.impressions||0)
+      });
+    });
+    (state.googleCampaigns?.results||[]).forEach(r => {
+      const name = r.campaign?.name || '';
+      const m = r.metrics || {};
+      const spend = Number(m.costMicros || 0) / 1e6;
+      if (spend === 0 && Number(m.impressions || 0) === 0) return;
+      const cls = classifyByName(name);
+      const hq = cls.channel === '본사' ? '본사' : (centerToHq(cls.center) || null);
+      all.push({
+        platform:'Google', name, service:cls.service, channel:cls.channel, center:cls.center,
+        hq, spend, conversions: Number(m.conversions || 0),
+        clicks: Number(m.clicks || 0), impressions: Number(m.impressions || 0)
       });
     });
     return all.filter(c => {
@@ -513,7 +561,8 @@
     return buckets;
   }
 
-  // ──────────────────── 데이터 로딩 ────────────────────
+  // ──────────────────── 데이터 로딩 (progressive) ────────────────────
+  // 각 매체별 fetch가 완료되는 즉시 화면 업데이트 — Naver가 느려도 다른 매체는 먼저 표시됨.
   async function loadAll() {
     const dp = state.datePreset;
     const presetLabels = {today:'오늘',yesterday:'어제',last_7d:'최근 7일',last_14d:'최근 14일',last_30d:'최근 30일',this_month:'이번 달',last_month:'지난 달'};
@@ -523,26 +572,40 @@
     const leadQ = q
       + (state.hq !== 'all' ? `&hq=${encodeURIComponent(state.hq)}` : '')
       + (state.center !== 'all' ? `&center=${encodeURIComponent(state.center)}` : '');
+
+    // 로딩 표시 + 이전 데이터 초기화 (필터 변경 시 빠르게 새 데이터로 갱신)
+    state.naverData = null;
+    state.metaData = null;
+    state.metaCampaigns = null;
+    state.googleCampaigns = null;
+    state.leadData = null;
+    document.getElementById('lastUpdated').textContent = '로딩 중…';
+    renderAllSafe();
+
+    const tasks = [
+      fetchJson(`/api/meta/insights?${q}`).then(d => { state.metaData = d; renderAllSafe(); }).catch(e => console.error('meta', e)),
+      fetchJson(`/api/meta/insights/campaigns?${q}`).then(d => { state.metaCampaigns = d; renderAllSafe(); }).catch(e => console.error('metaCamps', e)),
+      fetchJson(`/api/google/insights/campaigns?${q}`).then(d => { state.googleCampaigns = d; renderAllSafe(); }).catch(e => { console.error('google', e); state.googleCampaigns = { results: [] }; renderAllSafe(); }),
+      fetchJson(`/api/leads/by-category?${leadQ}`).then(d => { state.leadData = d; renderAllSafe(); }).catch(() => { state.leadData = { total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }; renderAllSafe(); }),
+      // Naver는 7개 계정 직렬 호출이라 가장 느림 — 마지막에 채워짐
+      fetchJson(`/api/naver/insights/by-category?${q}`).then(d => { state.naverData = d; renderAllSafe(); }).catch(e => console.error('naver', e)),
+    ];
+
+    Promise.allSettled(tasks).then(() => {
+      document.getElementById('lastUpdated').textContent = '최종 ' + new Date().toLocaleTimeString('ko-KR');
+    });
+  }
+
+  function renderAllSafe() {
     try {
-      const [naver, meta, metaCamps, leads] = await Promise.all([
-        fetchJson(`/api/naver/insights/by-category?${q}`),
-        fetchJson(`/api/meta/insights?${q}`),
-        fetchJson(`/api/meta/insights/campaigns?${q}`),
-        fetchJson(`/api/leads/by-category?${leadQ}`).catch(() => ({ total:0, byService:{}, byCenter:{}, byHq:{}, byDate:{} }))
-      ]);
-      state.naverData = naver;
-      state.metaData = meta;
-      state.metaCampaigns = metaCamps;
-      state.leadData = leads;
       renderKpiStrip();
       renderServiceCards();
       renderHqCards();
       renderTrendOverall();
       renderTrendByHq();
       renderPlatform();
-      document.getElementById('lastUpdated').textContent = '최종 ' + new Date().toLocaleTimeString('ko-KR');
     } catch (e) {
-      console.error(e);
+      console.error('render error', e);
     }
   }
 
@@ -656,7 +719,7 @@
             <div class="h-full rounded-full" style="width:${pct}%;background:var(--caring-primary)"></div>
           </div>
           <div class="flex items-center justify-between mt-2">
-            <span class="text-xs text-slate-500">전화 ${b.conversions}</span>
+            <span class="text-xs text-slate-500">전화 ${fmt.int(b.conversions)}</span>
             <span class="text-xs text-slate-400">${subtitle}</span>
           </div>
         </button>`;
@@ -807,10 +870,6 @@
         spend: c.spend, imps: c.impressions, clicks: c.clicks, conv: c.conversions
       });
     });
-    if (p === 'google') {
-      // scaffold — empty
-      campaigns = [];
-    }
     document.getElementById('ps-spend').textContent = fmt.money(spend);
     document.getElementById('ps-imps').textContent = fmt.int(imps);
     document.getElementById('ps-clicks').textContent = fmt.int(clicks);
@@ -826,7 +885,7 @@
     const host = document.getElementById('platformCampaignChart');
     if (state.charts.platCamp) state.charts.platCamp.destroy();
     if (!top.length) {
-      host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음${p==='google'?' (Google 미연동)':''}</div>`;
+      host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음</div>`;
     } else {
       host.innerHTML = '';
       const platColor = (PLATFORM_COLOR[p] || PLATFORM_COLOR.all).primary;
@@ -877,7 +936,7 @@
             <td class="px-2 py-1 text-slate-500">${c.service}</td>
             <td class="px-2 py-1">${c.name||''}</td>
             <td class="px-2 py-1 text-right">${fmt.money(c.spend)}</td>
-            <td class="px-2 py-1 text-right font-medium accent-text">${c.conv}</td>
+            <td class="px-2 py-1 text-right font-medium accent-text">${fmt.int(c.conv)}</td>
           </tr>`;
         }).join('')}
         </tbody>`;
@@ -908,6 +967,12 @@
     });
     (state.metaCampaigns?.data||[]).forEach(c => {
       const cls = classifyByName(c.campaign_name);
+      if (!cls.center) return;
+      const hq = centerToHq(cls.center);
+      if (state.hq === 'all' || hq === state.hq) dataCenters.add(normalizeCenterName(cls.center));
+    });
+    (state.googleCampaigns?.results||[]).forEach(r => {
+      const cls = classifyByName(r.campaign?.name);
       if (!cls.center) return;
       const hq = centerToHq(cls.center);
       if (state.hq === 'all' || hq === state.hq) dataCenters.add(normalizeCenterName(cls.center));

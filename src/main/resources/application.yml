@@ -4,6 +4,20 @@ server:
 spring:
   application:
     name: ads-dashboard
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${DASHBOARD_OAUTH_CLIENT_ID:}
+            client-secret: ${DASHBOARD_OAUTH_CLIENT_SECRET:}
+            scope:
+              - openid
+              - email
+              - profile
+
+app:
+  allowed-email-domain: ${ALLOWED_EMAIL_DOMAIN:caring.co.kr}
 
 management:
   endpoints:
