@@ -17,7 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
   private static final Set<String> PUBLIC_PATHS = Set.of(
-      "/actuator/health", "/actuator/info", "/error", "/login", "/login.html", "/favicon.ico");
+      "/actuator/health", "/actuator/info", "/error", "/login", "/login.html", "/favicon.ico", "/logo.png");
 
   @Value("${app.allowed-email-domain:caring.co.kr}")
   private String allowedDomain;
