@@ -246,6 +246,14 @@
       </div>
     </div>
     <div class="card p-5 mt-4">
+      <div class="flex items-baseline justify-between mb-4">
+        <h3 class="text-sm font-semibold">온라인 vs 오프라인 효율 비교 <span class="text-xs text-slate-400 font-normal">비용 종합 ÷ 신규콜 = 신규콜 1건당 광고비</span></h3>
+        <span class="text-[11px] text-slate-400" id="cpaScopeLabel">전체 본부</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="cpaCompare"></div>
+      <p class="text-[11px] text-slate-400 mt-3">※ 신규콜은 채널별 귀속이 없어 양쪽 모두 동일한 신규콜 수를 분모로 사용합니다. 단순 광고비 효율 비교 지표로 참고용.</p>
+    </div>
+    <div class="card p-5 mt-4">
       <h3 class="text-sm font-semibold mb-3">본부별 종합 <span class="text-xs text-slate-400 font-normal">지출 · 전화클릭 · 신규콜</span></h3>
       <div id="trendByHq" style="height:300px"></div>
       <p class="text-xs text-slate-400 mt-2">막대=전화클릭·신규콜(좌축), 선=지출(우축)</p>
@@ -950,6 +958,73 @@
   function renderTrendOverall() {
     renderOnVsOffAll();
     renderOnVsOffScoped();
+    renderCpaCompare();
+  }
+
+  function renderCpaCompare() {
+    const host = document.getElementById('cpaCompare');
+    if (!host) return;
+    const scopeEl = document.getElementById('cpaScopeLabel');
+
+    // 사이드바 필터 그대로 사용 (본부/센터/서비스 선택 반영)
+    const online  = getFilteredCampaigns().reduce((a, c) => a + (c.spend || 0), 0);
+
+    let offline = 0;
+    let scope = '전체 본부';
+    if (state.center && state.center !== 'all') {
+      offline = Number(state.offlineData?.byCenter?.[state.center] || 0);
+      scope = state.center;
+    } else if (state.hq && state.hq !== 'all') {
+      offline = Number(state.offlineData?.byHq?.[state.hq] || 0);
+      scope = state.hq;
+    } else {
+      offline = Object.values(state.offlineData?.byMedia || {})
+                      .reduce((a, v) => a + Number(v || 0), 0);
+    }
+    if (scopeEl) scopeEl.textContent = scope;
+
+    const calls = pickLeadCount();
+    const onCpa  = calls > 0 ? online  / calls : null;
+    const offCpa = calls > 0 ? offline / calls : null;
+
+    const winner = (onCpa != null && offCpa != null && onCpa !== offCpa)
+      ? (onCpa < offCpa ? 'online' : 'offline')
+      : null;
+
+    function card(kind, cost, cpa) {
+      const isOnline = kind === 'online';
+      const tone = isOnline ? '#EF6079' : '#5BA8A0';
+      const bg   = isOnline ? '#FEF1F4' : '#ECF5F3';
+      const title = isOnline ? '온라인 광고' : '오프라인 광고';
+      const isWinner = winner === kind;
+      const winBadge = isWinner
+        ? `<span class="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full" style="background:${tone};color:#fff">CPA 우위</span>`
+        : '';
+      const cpaStr = cpa == null ? '—' : fmt.money(Math.round(cpa));
+      return `
+        <div class="p-4 rounded-xl" style="background:${bg};border:1px solid ${tone}33">
+          <div class="flex items-center mb-3">
+            <span class="text-sm font-semibold" style="color:${tone}">${title}</span>${winBadge}
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <p class="text-[11px] text-slate-500">광고비 종합</p>
+              <p class="text-lg font-bold text-slate-800">${fmt.money(Math.round(cost))}</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-slate-500">신규콜</p>
+              <p class="text-lg font-bold text-slate-800">${fmt.int(calls)}건</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-slate-500">CPA (1콜당)</p>
+              <p class="text-lg font-bold" style="color:${tone}">${cpaStr}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    host.innerHTML = card('online', online, onCpa) + card('offline', offline, offCpa);
   }
 
   function renderOnVsOffAll() {
