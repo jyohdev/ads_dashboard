@@ -1364,6 +1364,11 @@
       tooltip: { y: { formatter: v => fmt.money(v) } },
       plotOptions: { pie: { donut: { size: '62%', labels: {
         show: true,
+        // 슬라이스 hover 시 중앙에 금액 대신 퍼센트 표시
+        value: { formatter: (val) => {
+          const n = Number(val);
+          return total > 0 ? (n / total * 100).toFixed(1) + '%' : '—';
+        } },
         total: { show: true, label: label, formatter: () => fmt.money(total) }
       } } } }
     });
