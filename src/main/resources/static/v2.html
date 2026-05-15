@@ -184,23 +184,28 @@
       <div class="card p-5">
         <p class="text-xs text-slate-500">총 지출</p>
         <p class="text-xl font-bold mt-2 accent-text" id="kpi-spend">—</p>
+        <p class="text-[10px] mt-1" id="kpi-spend-delta">&nbsp;</p>
         <p class="text-[10px] text-slate-400 mt-1">Naver · Google · Meta · Offline 합계</p>
       </div>
       <div class="card p-5">
         <p class="text-xs text-slate-500">노출</p>
         <p class="text-xl font-bold mt-2" id="kpi-impressions">—</p>
+        <p class="text-[10px] mt-1" id="kpi-impressions-delta">&nbsp;</p>
       </div>
       <div class="card p-5">
         <p class="text-xs text-slate-500">클릭</p>
         <p class="text-xl font-bold mt-2" id="kpi-clicks">—</p>
+        <p class="text-[10px] mt-1" id="kpi-clicks-delta">&nbsp;</p>
       </div>
       <div class="card p-5">
         <p class="text-xs text-slate-500">전화 클릭</p>
         <p class="text-xl font-bold mt-2 accent-text" id="kpi-conversions">—</p>
+        <p class="text-[10px] mt-1" id="kpi-conversions-delta">&nbsp;</p>
       </div>
       <div class="card p-5 kpi-newcall">
         <p class="text-xs font-medium newcall-text">신규콜</p>
         <p class="text-2xl font-bold mt-2 newcall-text" id="kpi-newcomers">—</p>
+        <p class="text-[10px] mt-1" id="kpi-newcomers-delta">&nbsp;</p>
       </div>
     </div>
   </section>
@@ -444,7 +449,49 @@
     return `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium" style="background:${c.soft};color:${c.text}">${p}</span>`;
   }
 
-  const state = { datePreset:'this_month', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null };
+  const state = { datePreset:'this_month', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null, prev:{ naverData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null, label:'' } };
+
+  // 직전 동일 기간 산출 (지난달/지난주/어제…). 결과: { since:'YYYY-MM-DD', until:'YYYY-MM-DD', label }
+  function prevPeriodRange() {
+    const fmtD = d => d.toISOString().slice(0,10);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dp = state.datePreset;
+    if (dp === 'custom' && state.since && state.until) {
+      const s = new Date(state.since), u = new Date(state.until);
+      const len = Math.round((u - s) / 86400000) + 1;
+      const prevU = new Date(s); prevU.setDate(prevU.getDate() - 1);
+      const prevS = new Date(prevU); prevS.setDate(prevS.getDate() - (len - 1));
+      return { since: fmtD(prevS), until: fmtD(prevU), label: '이전 동일기간' };
+    }
+    if (dp === 'this_month') {
+      const firstThis = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastPrev = new Date(firstThis); lastPrev.setDate(0);
+      const firstPrev = new Date(lastPrev.getFullYear(), lastPrev.getMonth(), 1);
+      return { since: fmtD(firstPrev), until: fmtD(lastPrev), label: '지난달' };
+    }
+    if (dp === 'last_month') {
+      const firstThis = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastPrev = new Date(firstThis); lastPrev.setDate(0);
+      const firstPrev = new Date(lastPrev.getFullYear(), lastPrev.getMonth(), 1);
+      const lastPP = new Date(firstPrev); lastPP.setDate(0);
+      const firstPP = new Date(lastPP.getFullYear(), lastPP.getMonth(), 1);
+      return { since: fmtD(firstPP), until: fmtD(lastPP), label: '전전월' };
+    }
+    if (dp === 'today') {
+      const y = new Date(today); y.setDate(y.getDate() - 1);
+      return { since: fmtD(y), until: fmtD(y), label: '어제' };
+    }
+    if (dp === 'yesterday') {
+      const dby = new Date(today); dby.setDate(dby.getDate() - 2);
+      return { since: fmtD(dby), until: fmtD(dby), label: '그저께' };
+    }
+    const map = { last_7d:7, last_14d:14, last_30d:30 };
+    const days = map[dp] || 7;
+    const curUntil = new Date(today);
+    const prevUntil = new Date(today); prevUntil.setDate(prevUntil.getDate() - days);
+    const prevSince = new Date(prevUntil); prevSince.setDate(prevSince.getDate() - (days - 1));
+    return { since: fmtD(prevSince), until: fmtD(prevUntil), label: `전 ${days}일` };
+  }
 
   // ApexCharts 전역 — 애니메이션 끄고 폰트 통일 (렌더 ~3-5배 빨라짐)
   if (typeof Apex !== 'undefined') {
@@ -686,6 +733,23 @@
     Promise.allSettled(tasks).then(() => {
       document.getElementById('lastUpdated').textContent = '최종 ' + new Date().toLocaleTimeString('ko-KR');
     });
+
+    // 직전 기간 fetch — KPI 카드 델타용. 캐시되면 비용 거의 없음.
+    state.prev.naverData = null; state.prev.metaCampaigns = null; state.prev.googleCampaigns = null;
+    state.prev.leadData = null; state.prev.offlineData = null;
+    const pp = prevPeriodRange();
+    state.prev.label = pp.label;
+    const pq = `datePreset=custom&since=${pp.since}&until=${pp.until}`;
+    const plQ = pq
+      + (state.hq !== 'all' ? `&hq=${encodeURIComponent(state.hq)}` : '')
+      + (state.center !== 'all' ? `&center=${encodeURIComponent(state.center)}` : '');
+    Promise.allSettled([
+      fetchJson(`/api/meta/insights/campaigns?${pq}`).then(d => { state.prev.metaCampaigns = d; scheduleRender(); }).catch(()=>{}),
+      fetchJson(`/api/google/insights/campaigns?${pq}`).then(d => { state.prev.googleCampaigns = d; scheduleRender(); }).catch(()=>{ state.prev.googleCampaigns = { results: [] }; scheduleRender(); }),
+      fetchJson(`/api/naver/insights/by-category?${pq}`).then(d => { state.prev.naverData = d; scheduleRender(); }).catch(()=>{}),
+      fetchJson(`/api/leads/by-category?${plQ}`).then(d => { state.prev.leadData = d; scheduleRender(); }).catch(()=>{ state.prev.leadData = { total:0, byService:{}, byHq:{}, byCenter:{} }; scheduleRender(); }),
+      fetchJson(`/api/offline/by-category?${plQ}`).then(d => { state.prev.offlineData = d; scheduleRender(); }).catch(()=>{ state.prev.offlineData = { totalAmount:0, byMedia:{}, byHq:{}, byCenter:{} }; scheduleRender(); }),
+    ]);
   }
 
   // ──────────────────── 오프라인 광고 ────────────────────
@@ -792,17 +856,100 @@
       a.spend += c.spend; a.imps += c.impressions; a.clicks += c.clicks; a.conv += c.conversions;
       return a;
     }, { spend:0, imps:0, clicks:0, conv:0 });
-    // 총 지출 = 온라인(Naver+Google+Meta) + 오프라인
     const offlineSpend = Number(state.offlineData?.totalAmount || 0);
     const totalSpend = sum.spend + offlineSpend;
+    const newCalls = pickLeadCount();
+
     document.getElementById('kpi-spend').textContent = fmt.money(totalSpend);
     document.getElementById('kpi-impressions').textContent = fmt.int(sum.imps);
     document.getElementById('kpi-clicks').textContent = fmt.int(sum.clicks);
     document.getElementById('kpi-conversions').textContent = fmt.int(sum.conv);
-    const newCalls = pickLeadCount();
     document.getElementById('kpi-newcomers').textContent = newCalls > 0 ? fmt.int(newCalls) : '—';
     const hero = document.getElementById('hero-spend');
     if (hero) hero.textContent = fmt.money(totalSpend);
+
+    // 직전 기간 대비 % 델타
+    const prev = computePrevSum();
+    setDelta('kpi-spend-delta',       totalSpend,    prev.spend);
+    setDelta('kpi-impressions-delta', sum.imps,      prev.imps);
+    setDelta('kpi-clicks-delta',      sum.clicks,    prev.clicks);
+    setDelta('kpi-conversions-delta', sum.conv,      prev.conv);
+    setDelta('kpi-newcomers-delta',   newCalls,      prev.newCalls);
+  }
+
+  function computePrevSum() {
+    // 직전 기간 캠페인을 동일한 필터(서비스/본부/센터)로 합산
+    const list = [];
+    (state.prev.naverData?.rows||[]).forEach(r => {
+      const cls = _classifyByNameC(r.name);
+      const hq = cls.channel === '본사' ? '본사' : (_centerToHqC(cls.center) || null);
+      list.push({ service:cls.service, channel:cls.channel, center:cls.center, hq,
+        spend:Number(r.salesAmt||0), imps:Number(r.impCnt||0),
+        clicks:Number(r.clkCnt||0), conv:Number(r.ccnt||0) });
+    });
+    (state.prev.metaCampaigns?.data||[]).forEach(c => {
+      const cls = _classifyByNameC(c.campaign_name);
+      const hq = cls.channel === '본사' ? '본사' : (_centerToHqC(cls.center) || null);
+      const conv = (c.actions||[]).filter(a=>a.action_type==='offsite_conversion.fb_pixel_custom').reduce((s,a)=>s+Number(a.value||0),0);
+      list.push({ service:cls.service, channel:cls.channel, center:cls.center, hq,
+        spend:Number(c.spend||0), imps:Number(c.impressions||0),
+        clicks:Number(c.clicks||0), conv });
+    });
+    (state.prev.googleCampaigns?.results||[]).forEach(r => {
+      const name = r.campaign?.name || '';
+      const m = r.metrics || {};
+      const spend = Number(m.costMicros||0)/1e6;
+      if (spend === 0 && Number(m.impressions||0) === 0) return;
+      const cls = _classifyByNameC(name);
+      const hq = cls.channel === '본사' ? '본사' : (_centerToHqC(cls.center) || null);
+      list.push({ service:cls.service, channel:cls.channel, center:cls.center, hq,
+        spend, imps:Number(m.impressions||0),
+        clicks:Number(m.clicks||0), conv:Number(m.conversions||0) });
+    });
+    // 동일한 필터 적용
+    const filtered = list.filter(c => {
+      if (state.service !== 'all') {
+        if (state.service === '본사') { if (c.channel !== '본사') return false; }
+        else if (c.service !== state.service) return false;
+      }
+      if (state.hq !== 'all' && c.hq !== state.hq) return false;
+      if (state.center !== 'all') {
+        const raw = c.center;
+        if (raw !== state.center && _normCenterC(raw) !== state.center) return false;
+      }
+      return true;
+    });
+    const acc = filtered.reduce((a,c) => {
+      a.spend += c.spend; a.imps += c.imps; a.clicks += c.clicks; a.conv += c.conv;
+      return a;
+    }, { spend:0, imps:0, clicks:0, conv:0 });
+    acc.spend += Number(state.prev.offlineData?.totalAmount || 0);
+    // 신규콜 — service 필터 반영
+    const ld = state.prev.leadData;
+    let nc = 0;
+    if (ld) {
+      if (state.service === 'all') nc = Number(ld.total||0);
+      else if (ld.byService && ld.byService[state.service] != null) nc = Number(ld.byService[state.service]);
+    }
+    acc.newCalls = nc;
+    return acc;
+  }
+
+  function setDelta(elId, cur, prev) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!prev || prev === 0) {
+      el.innerHTML = '&nbsp;';
+      el.style.color = '';
+      return;
+    }
+    const diff = cur - prev;
+    const pct = (diff / prev) * 100;
+    const sign = diff > 0 ? '▲' : (diff < 0 ? '▼' : '');
+    const color = diff > 0 ? '#16A34A' : (diff < 0 ? '#DC2626' : '#94A3B8');
+    const label = state.prev?.label || '직전 기간';
+    el.style.color = color;
+    el.innerHTML = `${sign} ${Math.abs(pct).toFixed(1)}% <span class="text-slate-400">vs ${label}</span>`;
   }
 
   // 사이드바 nav active 상태 + 스크롤 위치 따라 자동 하이라이트
