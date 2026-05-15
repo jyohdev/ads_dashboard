@@ -27,7 +27,7 @@ google:
   refresh-token: ${GOOGLE_ADS_REFRESH_TOKEN:}
   customer-id: ${GOOGLE_ADS_CUSTOMER_ID:}
   login-customer-id: ${GOOGLE_ADS_LOGIN_CUSTOMER_ID:}
-  api-version: ${GOOGLE_ADS_API_VERSION:v17}
+  api-version: ${GOOGLE_ADS_API_VERSION:v20}
 
 naver:
   base-url: ${NAVER_ADS_BASE_URL:https://api.searchad.naver.com}

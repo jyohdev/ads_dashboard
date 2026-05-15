@@ -12,7 +12,7 @@ public record GoogleProperties(
     String loginCustomerId,
     String apiVersion) {
 
-  private static final String DEFAULT_API_VERSION = "v17";
+  private static final String DEFAULT_API_VERSION = "v20";
 
   public GoogleProperties {
     if (apiVersion == null || apiVersion.isBlank()) {
