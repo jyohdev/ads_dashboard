@@ -67,13 +67,14 @@ public class LeadSheetFetcher implements LeadFetcher {
         SheetRef ref = parseRef(raw);
         try {
           String range = resolveRange(sheets, ref);
+          CenterType type = inferCenterType(range);
           ValueRange resp = sheets.spreadsheets().values()
               .get(ref.id, range)
               .execute();
           List<List<Object>> values = resp.getValues();
           if (values == null || values.isEmpty()) continue;
-          log.info("Sheet {} (range={}) → {} rows", ref.id, range, values.size() - 1);
-          merged.addAll(parse(values));
+          log.info("Sheet {} (range={}, type={}) → {} rows", ref.id, range, type, values.size() - 1);
+          merged.addAll(parse(values, type));
         } catch (Exception e) {
           log.error("Failed to read sheet {} (gid={})", ref.id, ref.gid, e);
         }
@@ -82,6 +83,17 @@ public class LeadSheetFetcher implements LeadFetcher {
       log.error("Failed to build Sheets client", e);
     }
     return merged;
+  }
+
+  /** 탭 이름에서 서비스 유형 추론. */
+  private enum CenterType { DAYCARE, HOMECARE, AUTO }
+
+  private static CenterType inferCenterType(String range) {
+    if (range == null) return CenterType.AUTO;
+    String r = range.toLowerCase();
+    if (r.contains("주간보호") || r.contains("주보") || r.contains("daycare")) return CenterType.DAYCARE;
+    if (r.contains("통합요양") || r.contains("방문요양") || r.contains("통요") || r.contains("방요") || r.contains("homecare")) return CenterType.HOMECARE;
+    return CenterType.AUTO;
   }
 
   /** URL 또는 plain ID에서 sheetId + (옵션) gid 분리. */
@@ -119,7 +131,7 @@ public class LeadSheetFetcher implements LeadFetcher {
 
   private record SheetRef(String id, Long gid) {}
 
-  private List<LeadEntry> parse(List<List<Object>> values) {
+  private List<LeadEntry> parse(List<List<Object>> values, CenterType type) {
     List<String> headers = new ArrayList<>();
     for (Object o : values.get(0)) headers.add(o == null ? "" : o.toString().trim());
     Map<String, Integer> idx = headerIndex(headers);
@@ -127,6 +139,8 @@ public class LeadSheetFetcher implements LeadFetcher {
     Integer hqIdx = idx.get("hq");
     Integer dcIdx = idx.get("daycare");
     Integer hcIdx = idx.get("homecare");
+    // 시트 3 (신규콜_전환_현황) 처럼 "센터명" 단일 컬럼인 경우, 탭 type 으로 어디에 넣을지 결정
+    Integer centerIdx = idx.get("center");
 
     List<LeadEntry> rows = new ArrayList<>();
     for (int i = 1; i < values.size(); i++) {
@@ -137,6 +151,16 @@ public class LeadSheetFetcher implements LeadFetcher {
       String hq = hqIdx != null ? blankToNull(cell(row, hqIdx)) : null;
       String dc = dcIdx != null ? blankToNull(cell(row, dcIdx)) : null;
       String hc = hcIdx != null ? blankToNull(cell(row, hcIdx)) : null;
+      // 단일 센터명 컬럼만 있을 때 탭 type 에 따라 분기
+      if (dc == null && hc == null && centerIdx != null) {
+        String c = blankToNull(cell(row, centerIdx));
+        if (c != null) {
+          if (type == CenterType.DAYCARE) dc = c;
+          else if (type == CenterType.HOMECARE) hc = c;
+          // AUTO 인 경우: 정보 부족 — 일단 daycare 로 가정 (또는 향후 키워드로 추정)
+          else dc = c;
+        }
+      }
       rows.add(new LeadEntry(d, hq, dc, hc));
     }
     return rows;
@@ -179,6 +203,8 @@ public class LeadSheetFetcher implements LeadFetcher {
         case "본부명", "본부", "hq" -> m.put("hq", i);
         case "주간보호센터명", "주간보호센터", "주보센터", "daycarecenter", "daycare" -> m.put("daycare", i);
         case "방문요양센터명", "방문요양센터", "방요센터", "homecarecenter", "homecare" -> m.put("homecare", i);
+        // 시트 raw 탭 (예: 신규콜_전환_현황/주간보호_RAW)처럼 단일 센터명 컬럼인 경우
+        case "센터명", "센터", "centername", "center" -> m.put("center", i);
         default -> {}
       }
     }
