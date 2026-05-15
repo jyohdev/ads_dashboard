@@ -237,11 +237,11 @@
     <h2 class="section-title mb-3">추이 분석</h2>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-5">
-        <h3 class="text-sm font-semibold mb-3">본부별 광고 비용 비중 <span class="text-xs text-slate-400 font-normal">온라인 + 오프라인 합산</span></h3>
-        <div id="costByHqDonut" style="height:300px"></div>
+        <h3 class="text-sm font-semibold mb-3">온라인 vs 오프라인 광고비 비중 <span class="text-xs text-slate-400 font-normal">전체 합계</span></h3>
+        <div id="costOnVsOffAllDonut" style="height:300px"></div>
       </div>
       <div class="card p-5">
-        <h3 class="text-sm font-semibold mb-3" id="costSplitTitle">온라인 vs 오프라인 광고 비용 <span class="text-xs text-slate-400 font-normal" id="costSplitSub">전체 본부</span></h3>
+        <h3 class="text-sm font-semibold mb-3" id="costSplitTitle">온라인 vs 오프라인 광고비 비중 <span class="text-xs text-slate-400 font-normal" id="costSplitSub">전체 본부</span></h3>
         <div id="costOnVsOffDonut" style="height:300px"></div>
       </div>
     </div>
@@ -530,7 +530,8 @@
   const SERVICE_LIST = ['본사','방문요양','주간보호','가족요양','요양보호사','장기요양등급'];
 
   // 통합 캠페인 리스트 (Naver + Meta), 분류 메타 포함, 현재 필터(본부/센터) 적용 후 반환
-  function getFilteredCampaigns() {
+  /** 전체 캠페인 (필터 적용 전). 분류·hq 매핑 포함. */
+  function getAllCampaigns() {
     const all = [];
     (state.naverData?.rows||[]).forEach(r => {
       const cls = classifyByName(r.name);
@@ -564,7 +565,11 @@
         clicks: Number(m.clicks || 0), impressions: Number(m.impressions || 0)
       });
     });
-    return all.filter(c => {
+    return all;
+  }
+
+  function getFilteredCampaigns() {
+    return getAllCampaigns().filter(c => {
       if (state.service !== 'all') {
         // 본사 탭은 channel=본사 기준 — 캠페인명에 "본사" 들어간 모든 캠페인
         // (방문요양·주간보호·가족요양·요양보호사·장기요양등급 본사 캠페인 다 포함)
@@ -940,69 +945,46 @@
   });
 
   // ──────────────────── 추이 차트 ────────────────────
-  /** 좌: 본부별 광고 비용 비중(온+오프 합산), 우: 온라인 vs 오프라인 비율(본부 선택 시 해당 본부). */
+  /** 좌·우 모두 온라인 vs 오프라인 광고비 비중 (2슬라이스=100%). 좌=전체, 우=선택 본부. */
   function renderTrendOverall() {
-    renderCostByHqDonut();
-    renderOnlineVsOfflineDonut();
+    renderOnVsOffDonut('costOnVsOffAllDonut', 'all',     '전체 합계', 'costSplitAll');
+    renderOnVsOffDonut('costOnVsOffDonut',    state.hq,  null,        'costSplit');
   }
 
-  function renderCostByHqDonut() {
-    const host = document.getElementById('costByHqDonut');
+  function renderOnVsOffDonut(hostId, hqScope, fixedLabel, chartKey) {
+    const host = document.getElementById(hostId);
     if (!host) return;
-    if (state.charts.costHq) state.charts.costHq.destroy();
-    // 본부별 온라인 지출
-    const cs = getFilteredCampaigns();
-    const byHq = {};
-    HQ_LIST.forEach(h => byHq[h] = 0);
-    cs.forEach(c => {
-      const hq = c.hq || '미매핑';
-      byHq[hq] = (byHq[hq] || 0) + c.spend;
-    });
-    // 오프라인 추가
-    const offHq = state.offlineData?.byHq || {};
-    Object.entries(offHq).forEach(([k, v]) => { byHq[k] = (byHq[k] || 0) + Number(v || 0); });
+    if (state.charts[chartKey]) state.charts[chartKey].destroy();
 
-    const entries = Object.entries(byHq).filter(([_, v]) => v > 0).sort((a,b) => b[1] - a[1]);
-    if (!entries.length) {
-      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음</div>';
-      return;
+    const useAll = !hqScope || hqScope === 'all';
+    const label = fixedLabel || (useAll ? '전체 본부' : hqScope);
+
+    // 호스트별 sub 라벨 갱신 (우측 본부 차트만)
+    if (hostId === 'costOnVsOffDonut') {
+      const sub = document.getElementById('costSplitSub');
+      if (sub) sub.textContent = label;
     }
-    host.innerHTML = '';
-    state.charts.costHq = new ApexCharts(host, {
-      chart: { type: 'donut', height: 300 },
-      series: entries.map(([_, v]) => Math.round(v)),
-      labels: entries.map(([k]) => k),
-      colors: ['#EF6079','#F8A1B4','#5BA8A0','#16A34A','#1E3A8A','#F59E0B','#A78BFA','#0EA5E9'],
-      legend: { position: 'right', fontSize: '11px' },
-      dataLabels: { formatter: v => v.toFixed(1) + '%' },
-      tooltip: { y: { formatter: v => fmt.money(v) } },
-      plotOptions: { pie: { donut: { size: '62%', labels: {
-        show: true,
-        total: { show: true, label: '총 비용', formatter: () => fmt.money(entries.reduce((a, [_,v]) => a+v, 0)) }
-      } } } }
-    });
-    state.charts.costHq.render();
-  }
 
-  function renderOnlineVsOfflineDonut() {
-    const host = document.getElementById('costOnVsOffDonut');
-    if (!host) return;
-    if (state.charts.costSplit) state.charts.costSplit.destroy();
+    // 온라인: state.hq/state.center 사이드바 필터 무시, hqScope 만 적용
+    // (서비스 필터는 적용 — 좌·우 모두 동일 서비스 스코프)
+    const online = getAllCampaigns()
+      .filter(c => {
+        if (state.service !== 'all') {
+          if (state.service === '본사') { if (c.channel !== '본사') return false; }
+          else if (c.service !== state.service) return false;
+        }
+        if (!useAll && c.hq !== hqScope) return false;
+        return true;
+      })
+      .reduce((a, c) => a + (c.spend || 0), 0);
 
-    const titleSub = document.getElementById('costSplitSub');
-    const hqLabel = state.hq && state.hq !== 'all' ? state.hq : '전체 본부';
-    if (titleSub) titleSub.textContent = hqLabel;
-
-    // 온라인: 필터된 캠페인 spend 합 (이미 HQ/센터 필터 적용됨)
-    const online = getFilteredCampaigns().reduce((a, c) => a + (c.spend || 0), 0);
-
-    // 오프라인: HQ 선택 시 byHq 사용, 아니면 byMedia 전체 합
+    // 오프라인
     let offline = 0;
-    if (state.hq && state.hq !== 'all') {
-      offline = Number(state.offlineData?.byHq?.[state.hq] || 0);
-    } else {
+    if (useAll) {
       const byMedia = state.offlineData?.byMedia || {};
       offline = Object.values(byMedia).reduce((a, v) => a + Number(v || 0), 0);
+    } else {
+      offline = Number(state.offlineData?.byHq?.[hqScope] || 0);
     }
 
     const total = online + offline;
@@ -1011,7 +993,7 @@
       return;
     }
     host.innerHTML = '';
-    state.charts.costSplit = new ApexCharts(host, {
+    state.charts[chartKey] = new ApexCharts(host, {
       chart: { type: 'donut', height: 300 },
       series: [Math.round(online), Math.round(offline)],
       labels: ['온라인 광고비', '오프라인 광고비'],
@@ -1021,10 +1003,10 @@
       tooltip: { y: { formatter: v => fmt.money(v) } },
       plotOptions: { pie: { donut: { size: '62%', labels: {
         show: true,
-        total: { show: true, label: hqLabel, formatter: () => fmt.money(total) }
+        total: { show: true, label: label, formatter: () => fmt.money(total) }
       } } } }
     });
-    state.charts.costSplit.render();
+    state.charts[chartKey].render();
   }
 
   function renderTrendByHq() {
