@@ -143,10 +143,10 @@
         <select id="dateFilter" class="filter-input">
           <option value="today">오늘</option>
           <option value="yesterday">어제</option>
-          <option value="last_7d" selected>최근 7일</option>
+          <option value="last_7d">최근 7일</option>
           <option value="last_14d">최근 14일</option>
           <option value="last_30d">최근 30일</option>
-          <option value="this_month">이번 달</option>
+          <option value="this_month" selected>이번 달</option>
           <option value="last_month">지난 달</option>
           <option value="custom">사용자 지정</option>
         </select>
@@ -436,7 +436,7 @@
     return `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium" style="background:${c.soft};color:${c.text}">${p}</span>`;
   }
 
-  const state = { datePreset:'last_7d', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null };
+  const state = { datePreset:'this_month', since:null, until:null, hq:'all', center:'all', service:'all', platform:'all', svcTrend:'all', charts:{}, naverData:null, metaData:null, metaCampaigns:null, googleCampaigns:null, leadData:null, offlineData:null };
 
   function buildDateQuery() {
     if (state.datePreset === 'custom' && state.since && state.until) {
