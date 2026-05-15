@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>케어링 광고 대시보드</title>
+  <title>케어링 마케팅 대시보드</title>
   <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="apple-touch-icon" href="/logo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -71,7 +71,7 @@
     <div class="flex items-center gap-2 px-2 mb-6">
       <img src="/logo.png" alt="케어링" class="w-9 h-9 rounded-xl object-cover" />
       <div>
-        <p class="font-bold text-sm">케어링 광고</p>
+        <p class="font-bold text-sm">케어링 마케팅</p>
         <p class="text-[10px] text-slate-400">Marketing Dashboard</p>
       </div>
     </div>
@@ -241,8 +241,8 @@
         <div id="costByHqDonut" style="height:300px"></div>
       </div>
       <div class="card p-5">
-        <h3 class="text-sm font-semibold mb-3">센터별 광고 비용 비중 <span class="text-xs text-slate-400 font-normal">상위 12개 센터</span></h3>
-        <div id="costByCenterDonut" style="height:300px"></div>
+        <h3 class="text-sm font-semibold mb-3" id="costSplitTitle">온라인 vs 오프라인 광고 비용 <span class="text-xs text-slate-400 font-normal" id="costSplitSub">전체 본부</span></h3>
+        <div id="costOnVsOffDonut" style="height:300px"></div>
       </div>
     </div>
     <div class="card p-5 mt-4">
@@ -318,7 +318,7 @@
     </div>
   </section>
 
-  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 광고 대시보드 · Meta · Google Ads · Naver API 실시간 · 신규콜·오프라인은 Google Sheets 연동</p>
+  <p class="text-xs text-slate-400 text-center pt-4">© 케어링 마케팅 대시보드 · Meta · Google Ads · Naver API 실시간 · 신규콜·오프라인은 Google Sheets 연동</p>
 </main>
 
   </div>
@@ -940,10 +940,10 @@
   });
 
   // ──────────────────── 추이 차트 ────────────────────
-  /** 본부별 + 센터별 광고 비용 도넛 (온라인 + 오프라인 합산). renderTrendOverall 자리. */
+  /** 좌: 본부별 광고 비용 비중(온+오프 합산), 우: 온라인 vs 오프라인 비율(본부 선택 시 해당 본부). */
   function renderTrendOverall() {
     renderCostByHqDonut();
-    renderCostByCenterDonut();
+    renderOnlineVsOfflineDonut();
   }
 
   function renderCostByHqDonut() {
@@ -984,39 +984,47 @@
     state.charts.costHq.render();
   }
 
-  function renderCostByCenterDonut() {
-    const host = document.getElementById('costByCenterDonut');
+  function renderOnlineVsOfflineDonut() {
+    const host = document.getElementById('costOnVsOffDonut');
     if (!host) return;
-    if (state.charts.costCenter) state.charts.costCenter.destroy();
-    const cs = getFilteredCampaigns();
-    const byCenter = {};
-    cs.forEach(c => {
-      const k = c.center || (c.channel === '본사' ? '(본사)' : '미매핑');
-      byCenter[k] = (byCenter[k] || 0) + c.spend;
-    });
-    const offCenter = state.offlineData?.byCenter || {};
-    Object.entries(offCenter).forEach(([k, v]) => { byCenter[k] = (byCenter[k] || 0) + Number(v || 0); });
+    if (state.charts.costSplit) state.charts.costSplit.destroy();
 
-    const entries = Object.entries(byCenter).filter(([_, v]) => v > 0).sort((a,b) => b[1] - a[1]).slice(0, 12);
-    if (!entries.length) {
-      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400">데이터 없음</div>';
+    const titleSub = document.getElementById('costSplitSub');
+    const hqLabel = state.hq && state.hq !== 'all' ? state.hq : '전체 본부';
+    if (titleSub) titleSub.textContent = hqLabel;
+
+    // 온라인: 필터된 캠페인 spend 합 (이미 HQ/센터 필터 적용됨)
+    const online = getFilteredCampaigns().reduce((a, c) => a + (c.spend || 0), 0);
+
+    // 오프라인: HQ 선택 시 byHq 사용, 아니면 byMedia 전체 합
+    let offline = 0;
+    if (state.hq && state.hq !== 'all') {
+      offline = Number(state.offlineData?.byHq?.[state.hq] || 0);
+    } else {
+      const byMedia = state.offlineData?.byMedia || {};
+      offline = Object.values(byMedia).reduce((a, v) => a + Number(v || 0), 0);
+    }
+
+    const total = online + offline;
+    if (total <= 0) {
+      host.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-400 text-center">데이터 없음<br/><span class="text-[10px]">기간 또는 본부를 변경해보세요</span></div>';
       return;
     }
     host.innerHTML = '';
-    state.charts.costCenter = new ApexCharts(host, {
+    state.charts.costSplit = new ApexCharts(host, {
       chart: { type: 'donut', height: 300 },
-      series: entries.map(([_, v]) => Math.round(v)),
-      labels: entries.map(([k]) => k),
-      colors: ['#EF6079','#F8A1B4','#FB923C','#F59E0B','#EAB308','#16A34A','#10B981','#5BA8A0','#0EA5E9','#1E3A8A','#A78BFA','#EC4899'],
-      legend: { position: 'right', fontSize: '11px' },
+      series: [Math.round(online), Math.round(offline)],
+      labels: ['온라인 광고비', '오프라인 광고비'],
+      colors: ['#EF6079', '#5BA8A0'],
+      legend: { position: 'right', fontSize: '12px' },
       dataLabels: { formatter: v => v.toFixed(1) + '%' },
       tooltip: { y: { formatter: v => fmt.money(v) } },
       plotOptions: { pie: { donut: { size: '62%', labels: {
         show: true,
-        total: { show: true, label: '상위 12 센터', formatter: () => fmt.money(entries.reduce((a, [_,v]) => a+v, 0)) }
+        total: { show: true, label: hqLabel, formatter: () => fmt.money(total) }
       } } } }
     });
-    state.charts.costCenter.render();
+    state.charts.costSplit.render();
   }
 
   function renderTrendByHq() {
