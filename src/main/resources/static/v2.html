@@ -769,11 +769,32 @@
   }
 
   // ──────────────────── 오프라인 광고 ────────────────────
+  /** 오프라인 시트 서비스값(주간보호/통합요양/공통)을 대시보드 서비스 탭에 매핑.
+   *  공통은 항상 포함 (특정 서비스에 귀속 안 되는 공용 비용). */
+  function offlineServiceMatch(rowSvc) {
+    if (state.service === 'all') return true;
+    if (!rowSvc) return false;
+    if (rowSvc === '공통') return true;
+    if (state.service === '주간보호') return rowSvc === '주간보호';
+    if (state.service === '방문요양') return rowSvc === '통합요양';
+    // 본사·가족요양·요양보호사·장기요양등급 — 시트에 대응 서비스 없음 → 공통만 (위에서 처리)
+    return false;
+  }
+
   function renderOffline() {
     const d = state.offlineData;
-    const total = Number(d?.totalAmount || 0);
-    const cnt = Number(d?.totalCount || 0);
-    const media = d?.byMedia || {};
+    // state.service 에 맞춰 rows 필터 후 집계 재계산
+    const allRows = d?.rows || [];
+    const scopedRows = state.service === 'all'
+      ? allRows
+      : allRows.filter(r => offlineServiceMatch(r.service));
+    const total = scopedRows.reduce((a, r) => a + Number(r.amount || 0), 0);
+    const cnt = scopedRows.length;
+    const media = {};
+    scopedRows.forEach(r => {
+      const k = r.mediaType || '기타';
+      media[k] = (media[k] || 0) + Number(r.amount || 0);
+    });
     const mediaEntries = Object.entries(media).sort((a,b) => b[1] - a[1]);
     document.getElementById('off-total').textContent = total > 0 ? fmt.money(total) : '—';
     document.getElementById('off-count').textContent = cnt > 0 ? fmt.int(cnt) + '건' : '—';
@@ -831,8 +852,8 @@
       state.charts.offlineMedia.render();
     }
 
-    // 최근 집행 내역 테이블 (최근 일자 순)
-    const rows = (d?.rows || []).slice().sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    // 최근 집행 내역 테이블 (서비스 스코프 적용, 최근 일자 순)
+    const rows = scopedRows.slice().sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     const tbl = document.getElementById('offlineTable');
     if (!rows.length) {
       tbl.innerHTML = '<tr><td class="text-center text-slate-400 py-4">데이터 없음</td></tr>';
