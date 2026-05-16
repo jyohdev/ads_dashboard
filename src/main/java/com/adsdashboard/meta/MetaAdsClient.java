@@ -1,5 +1,6 @@
 package com.adsdashboard.meta;
 
+import com.adsdashboard.common.AdApiException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -111,23 +112,16 @@ public class MetaAdsClient {
     return converter;
   }
 
-  public static class MetaApiException extends RuntimeException {
-
-    private final HttpStatusCode statusCode;
-    private final String responseBody;
+  /** Meta Graph API 호출 실패. {@link GlobalExceptionHandler} 가 공통 규격으로 변환한다. */
+  public static class MetaApiException extends AdApiException {
 
     public MetaApiException(HttpStatusCode statusCode, String responseBody, Throwable cause) {
-      super("Meta API error " + statusCode + ": " + responseBody, cause);
-      this.statusCode = statusCode;
-      this.responseBody = responseBody;
+      super("Meta", statusCode, responseBody, cause);
     }
 
-    public HttpStatusCode getStatusCode() {
-      return statusCode;
-    }
-
-    public String getResponseBody() {
-      return responseBody;
+    @Override
+    public String errorCode() {
+      return "meta_api_error";
     }
   }
 }

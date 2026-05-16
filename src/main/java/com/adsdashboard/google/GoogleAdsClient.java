@@ -1,5 +1,6 @@
 package com.adsdashboard.google;
 
+import com.adsdashboard.common.AdApiException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -115,23 +116,16 @@ public class GoogleAdsClient {
     return converter;
   }
 
-  public static class GoogleAdsApiException extends RuntimeException {
-
-    private final HttpStatusCode statusCode;
-    private final String responseBody;
+  /** Google Ads API 호출 실패. {@link GlobalExceptionHandler} 가 공통 규격으로 변환한다. */
+  public static class GoogleAdsApiException extends AdApiException {
 
     public GoogleAdsApiException(HttpStatusCode statusCode, String responseBody, Throwable cause) {
-      super("Google Ads API error " + statusCode + ": " + responseBody, cause);
-      this.statusCode = statusCode;
-      this.responseBody = responseBody;
+      super("Google Ads", statusCode, responseBody, cause);
     }
 
-    public HttpStatusCode getStatusCode() {
-      return statusCode;
-    }
-
-    public String getResponseBody() {
-      return responseBody;
+    @Override
+    public String errorCode() {
+      return "google_ads_api_error";
     }
   }
 }

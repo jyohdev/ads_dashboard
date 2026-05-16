@@ -19,6 +19,11 @@ spring:
 app:
   allowed-email-domain: ${ALLOWED_EMAIL_DOMAIN:caring.co.kr}
 
+# 시트 데이터(신규콜·오프라인·CAC) 자동 동기화 주기 (Spring cron, Asia/Seoul)
+# 기본: 매일 09:00, 15:00 — 오전·오후 각 1회
+sheet-sync:
+  cron: ${SHEET_SYNC_CRON:0 0 9,15 * * *}
+
 lead:
   # CSV fallback (sheet 미설정 시)
   csv-path: ${LEAD_CSV_PATH:data/leads.csv}

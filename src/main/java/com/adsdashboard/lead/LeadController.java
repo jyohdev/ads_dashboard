@@ -1,8 +1,6 @@
 package com.adsdashboard.lead;
 
 import java.util.Map;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,12 +24,5 @@ public class LeadController {
       @RequestParam(required = false) String hq,
       @RequestParam(required = false) String center) {
     return service.getByCategory(datePreset, since, until, hq, center);
-  }
-
-  @ExceptionHandler(Exception.class)
-  public ResponseEntity<Map<String, Object>> handle(Exception e) {
-    return ResponseEntity.status(500).body(Map.of(
-        "error", "leads_error",
-        "message", String.valueOf(e.getMessage())));
   }
 }

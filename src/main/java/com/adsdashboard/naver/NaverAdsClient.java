@@ -1,5 +1,6 @@
 package com.adsdashboard.naver;
 
+import com.adsdashboard.common.AdApiException;
 import com.adsdashboard.naver.NaverProperties.NaverAccount;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -145,23 +146,16 @@ public class NaverAdsClient {
     return converter;
   }
 
-  public static class NaverAdsApiException extends RuntimeException {
-
-    private final HttpStatusCode statusCode;
-    private final String responseBody;
+  /** Naver SearchAd API 호출 실패. {@link GlobalExceptionHandler} 가 공통 규격으로 변환한다. */
+  public static class NaverAdsApiException extends AdApiException {
 
     public NaverAdsApiException(HttpStatusCode statusCode, String responseBody, Throwable cause) {
-      super("Naver Ads API error " + statusCode + ": " + responseBody, cause);
-      this.statusCode = statusCode;
-      this.responseBody = responseBody;
+      super("Naver Ads", statusCode, responseBody, cause);
     }
 
-    public HttpStatusCode getStatusCode() {
-      return statusCode;
-    }
-
-    public String getResponseBody() {
-      return responseBody;
+    @Override
+    public String errorCode() {
+      return "naver_ads_api_error";
     }
   }
 }

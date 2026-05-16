@@ -11,7 +11,7 @@ public class CacService {
 
   public CacService(CacSheetFetcher fetcher) { this.fetcher = fetcher; }
 
-  @Cacheable(cacheNames = "cac", key = "'all'")
+  @Cacheable(cacheNames = "cac", key = "'all'", cacheManager = "sheetCacheManager")
   public Map<String, Object> getAll() {
     return fetcher.fetch().toApiPayload();
   }

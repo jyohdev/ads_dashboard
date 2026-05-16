@@ -5,9 +5,8 @@
 ## 작업 지시 기록 (2026-05-15부터)
 
 - **CLAUDE.md 업데이트 규칙**: 사용자가 명령하는 모든 지시사항을 이 파일에 누적 기록한다.
-- **자동 커밋 + 푸시 규칙**:
-  - 의미 있는 작업 단위가 끝날 때마다 별도 지시 없이도 `git commit` 후 `git push origin main` 실행한다.
-  - 단, 변경이 사용자 검토 대기 중이거나, 빌드/테스트가 실패한 상태에서는 보류한다.
+- **커밋 + 푸시 규칙** (2026-05-16 변경 — 기존 자동 커밋 규칙 폐기):
+  - `git commit` / `git push` 는 **사용자가 명령할 때만** 실행한다. 작업 단위가 끝나도 자동으로 커밋하지 않는다.
   - `.env` / `data/service-account.json` 같은 시크릿 파일은 절대 커밋하지 않는다(이미 `.gitignore` 처리됨).
   - 메인 브랜치 직접 push는 auto mode classifier가 막을 수 있음 — 막히면 사용자에게 알리고 `! git push origin main` 안내.
 - **OAuth / 로그인**:
@@ -33,3 +32,10 @@
 - **Google 전환수 표기**:
   - Google `metrics.conversions`는 전체 전환수(전화클릭 + 폼 + 기타). 정확히 전화클릭만 잡으려면 conversion_action segment 필요 — 후속 작업.
   - 캠페인 테이블과 본부 카드의 전환수에서 소수점 노출되던 부분 `fmt.int`로 반올림 처리.
+- **Spring MVC 구조 최적화 (2026-05-16)**:
+  - 패키지-바이-피처 구조 유지. `common` 패키지 신설 — `GlobalExceptionHandler`(@RestControllerAdvice), `AdApiException`(매체 예외 공통 부모), `DateRange`(공통 날짜 환산), `SheetSyncScheduler`.
+  - 컨트롤러별로 중복되던 `@ExceptionHandler` 제거 → `GlobalExceptionHandler` 로 일원화.
+- **시트 데이터 자동 동기화 (2026-05-16)**:
+  - 신규콜·오프라인·CAC 시트는 `SheetSyncScheduler` 가 매일 오전 9시·오후 3시(KST) 자동 갱신.
+  - 캐시 2분할: 광고 API `cacheManager`(5분) / 시트 `sheetCacheManager`(24h). 시트 캐시는 스케줄러가 갱신 주체.
+  - 실행 주기는 환경변수 `SHEET_SYNC_CRON` 으로 조정 (기본 `0 0 9,15 * * *`).
