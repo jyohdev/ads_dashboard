@@ -39,3 +39,11 @@
   - 신규콜·오프라인·CAC 시트는 `SheetSyncScheduler` 가 매일 오전 9시·오후 3시(KST) 자동 갱신.
   - 캐시 2분할: 광고 API `cacheManager`(5분) / 시트 `sheetCacheManager`(24h). 시트 캐시는 스케줄러가 갱신 주체.
   - 실행 주기는 환경변수 `SHEET_SYNC_CRON` 으로 조정 (기본 `0 0 9,15 * * *`).
+- **대시보드 성능 최적화 (2026-05-16)**:
+  - 병목: `/api/naver/insights/by-category` — 광고그룹명 조회가 7계정 × 캠페인별 N+1 직렬 호출.
+  - `CompletableFuture.supplyAsync`/`parallelStream` 을 executor 없이 쓰면 공용 ForkJoinPool(병렬도 = CPU-1)을 써서 1-vCPU 환경(Render)에선 사실상 직렬.
+  - 해결: `config/AsyncConfig` 의 전용 `ioExecutor`(32스레드) 도입 → 네이버 fan-out 호출 전부 이 풀에서. 캠페인별 광고그룹 조회 병렬화 + by-category 의 통계/광고그룹명 동시 실행.
+- **테스트 코드 (2026-05-16)**:
+  - 매핑·기간 순수 로직 단위 테스트: `DateRangeTest`(기간), `NaverClassifierTest`(온라인 캠페인명→서비스/본사/센터), `CenterNameNormalizerTest`(센터명 정규화), `LeadEntryTest`(본사/서비스 분류), `OfflineMediaResolveTest`(오프라인 매체).
+  - `AdsDashboardApplicationTests` 는 `@SpringBootTest(properties=...)` 로 더미 OAuth 주입 → `.env` 없이 `./gradlew test` 통과.
+  - Meta·Google 본부/센터 매핑은 프런트(v2.html) JS 라 JUnit 범위 밖 — 추후 JS 테스트 러너 필요.

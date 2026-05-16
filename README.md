@@ -21,8 +21,8 @@
 8. [로그인](#로그인)
 9. [로컬 실행](#로컬-실행)
 10. [API 엔드포인트](#api-엔드포인트)
-11. [디렉터리 구조](#디렉터리-구조)
-12. [Render 배포](#render-배포)
+11. [테스트](#테스트)
+12. [디렉터리 구조](#디렉터리-구조)
 
 ---
 
@@ -319,6 +319,31 @@ set -a && source .env && set +a && ./gradlew bootRun
 
 ---
 
+## 테스트
+
+매핑·집계처럼 "조용히 틀리면 치명적인" 순수 로직에 단위 테스트를 둔다. 외부 API·시트에
+의존하지 않으므로 `.env` 없이 `./gradlew test` 만으로 전부 실행된다.
+
+| 테스트 | 검증 대상 | 케이스 |
+|---|---|---|
+| `DateRangeTest` | 기간 환산 (`common.DateRange`) | preset 7종 · 커스텀 범위 · 폴백 · `contains` 경계 |
+| `NaverClassifierTest` | 온라인(네이버) 캠페인명 → 서비스/채널/센터 | 방문요양·주간보호·기타 / 본사·센터 / 센터 추출 |
+| `CenterNameNormalizerTest` | 시트 센터명 → 공식 명 정규화 | 병설·행정구·구센터명 별칭 |
+| `LeadEntryTest` | 신규콜 본사/방문요양/주간보호 분류 | 센터 채움 조합 |
+| `OfflineMediaResolveTest` | 오프라인 광고 매체 매핑 | 컬럼 → 비고 키워드 → 종류 → 기타 |
+| `AdsDashboardApplicationTests` | 스프링 컨텍스트 로딩 스모크 | — |
+
+```bash
+./gradlew test          # 전체 — 총 37 케이스 (2026-05-16 기준)
+```
+
+> **커버리지 경계** — Meta·Google 의 본부/센터/서비스 매핑은 프런트(`v2.html`)의
+> JavaScript(`classifyByName`·`pickStrongCenter`·`centerToHq`)에 있어 JUnit 범위 밖이다.
+> 네이버는 서버사이드 `NaverClassifier` 라 위 테스트로 커버된다. Meta·Google 까지
+> 검증하려면 별도 JS 테스트 러너 도입이 필요하다.
+
+---
+
 ## 디렉터리 구조
 
 ```
@@ -332,7 +357,8 @@ src/main/java/com/adsdashboard/
 ├── config/
 │   ├── SecurityConfig.java            OAuth + 도메인 제한
 │   ├── CacheConfig.java               2-tier 캐시 (광고 5분 / 시트 24h)
-│   └── SchedulingConfig.java          @EnableScheduling
+│   ├── SchedulingConfig.java          @EnableScheduling
+│   └── AsyncConfig.java               I/O fan-out 전용 스레드풀
 ├── meta/                              Meta Marketing API
 │   ├── MetaProperties.java
 │   ├── MetaAdsClient.java
@@ -378,6 +404,13 @@ src/main/resources/
     ├── login.html                     Google 로그인 페이지
     └── v2.html                        대시보드 SPA
 
+src/test/java/com/adsdashboard/         단위 테스트 (.env 불필요)
+├── common/DateRangeTest.java
+├── naver/NaverClassifierTest.java
+├── lead/CenterNameNormalizerTest.java · LeadEntryTest.java
+├── offline/OfflineMediaResolveTest.java
+└── AdsDashboardApplicationTests.java
+
 data/
 ├── leads.example.csv                  CSV 포맷 샘플 (commit OK)
 ├── leads.csv                          실데이터 (gitignored)
@@ -387,24 +420,6 @@ Dockerfile · render.yaml               배포
 .env.example                           환경변수 템플릿
 .env                                   실 자격증명 (gitignored)
 ```
-
----
-
-## Render 배포
-
-1. GitHub push 되어 있어야 함.
-2. [Render Dashboard](https://dashboard.render.com) → **New +** → **Blueprint**.
-3. 리포 선택 → `render.yaml` 자동 감지.
-4. 환경변수 입력 (`.env` 와 동일한 키, 운영용 값):
-   - `META_*`, `GOOGLE_ADS_*`, `NAVER_ADS_*`, `LEAD_SHEET_*`, `OFFLINE_SHEET_*`, `CAC_SHEET_*`
-   - `DASHBOARD_OAUTH_CLIENT_ID` / `_SECRET` (운영 도메인 redirect URI를 GCP에 등록)
-   - `GOOGLE_SERVICE_ACCOUNT_KEY` (JSON 통째로 paste)
-   - `SHEET_SYNC_CRON` (선택 — 기본 `0 0 9,15 * * *`)
-5. **Apply** → 첫 빌드 5~10분.
-
-> Render 무료 플랜은 15분 미사용 시 sleep, 다음 요청 시 30초~1분 cold start.
-> 이 경우 `SheetSyncScheduler` 의 스케줄도 sleep 중엔 동작하지 않으니, 시트 동기화가
-> 반드시 필요하면 유료 플랜 또는 외부 cron ping 을 권장한다.
 
 ---
 

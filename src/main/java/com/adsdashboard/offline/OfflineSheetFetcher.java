@@ -112,7 +112,8 @@ public class OfflineSheetFetcher {
       "전단지", "깔판", "가림막", "선반", "간판"
   };
 
-  private static String resolveMedia(String mediaRaw, String note, String kind) {
+  // package-private — OfflineMediaResolveTest 에서 단위 테스트한다.
+  static String resolveMedia(String mediaRaw, String note, String kind) {
     if (mediaRaw != null && !mediaRaw.isBlank() && !"기타".equals(mediaRaw)) {
       return mediaRaw;
     }

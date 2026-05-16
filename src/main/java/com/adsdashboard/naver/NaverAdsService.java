@@ -10,7 +10,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -24,18 +27,32 @@ public class NaverAdsService {
   private final NaverProperties props;
   private final NaverAdsClient client;
   private final NaverClassifier classifier;
+  private final Executor ioExecutor;
 
-  public NaverAdsService(NaverProperties props, NaverAdsClient client, NaverClassifier classifier) {
+  public NaverAdsService(NaverProperties props, NaverAdsClient client, NaverClassifier classifier,
+                         @Qualifier("ioExecutor") Executor ioExecutor) {
     this.props = props;
     this.client = client;
     this.classifier = classifier;
+    this.ioExecutor = ioExecutor;
+  }
+
+  /**
+   * {@code items} 의 각 원소를 {@code ioExecutor} 에서 동시에 처리하고, 결과를 입력 순서대로 모은다.
+   * 7개 계정 / 캠페인 N개를 부채꼴로 호출하는 코드가 전부 이 한 곳을 거친다.
+   */
+  private <T, R> List<R> inParallel(List<T> items, Function<T, R> fn) {
+    List<CompletableFuture<R>> futures = items.stream()
+        .map(it -> CompletableFuture.supplyAsync(() -> fn.apply(it), ioExecutor))
+        .toList();
+    return futures.stream().map(CompletableFuture::join).toList();
   }
 
   @Cacheable(cacheNames = "naverCampaigns", key = "'list'")
   public Map<String, Object> listCampaigns() {
     List<NaverAccount> active = props.activeAccounts();
-    List<Map<String, Object>> all = active.parallelStream()
-        .flatMap(acc -> client.listCampaigns(acc).stream())
+    List<Map<String, Object>> all = inParallel(active, client::listCampaigns).stream()
+        .flatMap(List::stream)
         .collect(Collectors.toList());
     return Map.of("campaigns", all, "configuredAccounts", active.size());
   }
@@ -43,13 +60,9 @@ public class NaverAdsService {
   @Cacheable(cacheNames = "naverCampaigns", key = "'adgroups'")
   public Map<String, Object> listAdGroups() {
     List<NaverAccount> active = props.activeAccounts();
-    List<Map<String, Object>> all = new ArrayList<>();
-    List<CompletableFuture<List<Map<String, Object>>>> futures = active.stream()
-        .map(acc -> CompletableFuture.supplyAsync(() -> fetchAccountAdGroups(acc)))
-        .toList();
-    for (CompletableFuture<List<Map<String, Object>>> f : futures) {
-      all.addAll(f.join());
-    }
+    List<Map<String, Object>> all = inParallel(active, this::fetchAccountAdGroups).stream()
+        .flatMap(List::stream)
+        .collect(Collectors.toList());
     return Map.of("adGroups", all, "configuredAccounts", active.size());
   }
 
@@ -67,8 +80,8 @@ public class NaverAdsService {
   public Map<String, Object> getAdGroupInsights(String datePreset, String since, String until) {
     DateSpec spec = resolveDateSpec(datePreset, since, until);
     List<NaverAccount> active = props.activeAccounts();
-    List<Map<String, Object>> rows = active.parallelStream()
-        .flatMap(acc -> fetchAdGroupStats(acc, spec).stream())
+    List<Map<String, Object>> rows = inParallel(active, acc -> fetchAdGroupStats(acc, spec)).stream()
+        .flatMap(List::stream)
         .collect(Collectors.toList());
     return Map.of(
         "stats", rows,
@@ -82,12 +95,15 @@ public class NaverAdsService {
 
   @Cacheable(cacheNames = "naverInsights", key = "'byCategory:' + #datePreset + ':' + #since + ':' + #until")
   public Map<String, Object> getInsightsByCategory(String datePreset, String since, String until) {
-    Map<String, Object> raw = fetchCampaignInsightsRaw(datePreset, since, until);
+    // 캠페인 통계와 광고그룹명 조회는 서로 독립적인 7-계정 fan-out — 동시에 실행한다.
+    CompletableFuture<Map<String, Object>> rawFuture = CompletableFuture.supplyAsync(
+        () -> fetchCampaignInsightsRaw(datePreset, since, until), ioExecutor);
+    Map<String, String> adgroupNamesByCampaign = fetchAdgroupNamesByCampaign();
+    Map<String, Object> raw = rawFuture.join();
+
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> rows =
         (List<Map<String, Object>>) raw.getOrDefault("stats", List.of());
-
-    Map<String, String> adgroupNamesByCampaign = fetchAdgroupNamesByCampaign();
 
     Map<String, Aggregate> serviceTotals = new LinkedHashMap<>();
     serviceTotals.put(NaverClassifier.SERVICE_HOMECARE, new Aggregate());
@@ -157,14 +173,15 @@ public class NaverAdsService {
 
   /** campaignId → space-joined adgroup names (across all 7 accounts). Per-account errors are skipped. */
   private Map<String, String> fetchAdgroupNamesByCampaign() {
-    Map<String, String> map = new HashMap<>();
-    for (NaverAccount acc : props.activeAccounts()) {
-      List<Map<String, Object>> adgroups;
+    List<List<Map<String, Object>>> perAccount = inParallel(props.activeAccounts(), acc -> {
       try {
-        adgroups = fetchAccountAdGroups(acc);
+        return fetchAccountAdGroups(acc);
       } catch (RuntimeException e) {
-        continue;
+        return List.<Map<String, Object>>of();
       }
+    });
+    Map<String, String> map = new HashMap<>();
+    for (List<Map<String, Object>> adgroups : perAccount) {
       for (Map<String, Object> adg : adgroups) {
         Object campId = adg.get("nccCampaignId");
         Object adgName = adg.get("name");
@@ -178,24 +195,21 @@ public class NaverAdsService {
   private Map<String, Object> fetchCampaignInsightsRaw(String datePreset, String since, String until) {
     DateSpec spec = resolveDateSpec(datePreset, since, until);
     List<NaverAccount> active = props.activeAccounts();
-    // 7개 계정 병렬 호출 — 가장 큰 perf 병목이었음
-    List<CompletableFuture<AccountResult>> futures = active.stream()
-        .map(acc -> CompletableFuture.supplyAsync(() -> {
-          try {
-            return new AccountResult(fetchCampaignStats(acc, spec), null);
-          } catch (RuntimeException e) {
-            Map<String, Object> err = new LinkedHashMap<>();
-            err.put("account", acc.name());
-            err.put("customerId", acc.customerId());
-            err.put("error", e.getMessage());
-            return new AccountResult(List.of(), err);
-          }
-        }))
-        .toList();
+    // 7개 계정을 ioExecutor 에서 동시 호출 — 공용 ForkJoinPool 의존 시 1-vCPU 에선 직렬화된다.
+    List<AccountResult> results = inParallel(active, acc -> {
+      try {
+        return new AccountResult(fetchCampaignStats(acc, spec), null);
+      } catch (RuntimeException e) {
+        Map<String, Object> err = new LinkedHashMap<>();
+        err.put("account", acc.name());
+        err.put("customerId", acc.customerId());
+        err.put("error", e.getMessage());
+        return new AccountResult(List.of(), err);
+      }
+    });
     List<Map<String, Object>> rows = new ArrayList<>();
     List<Map<String, Object>> errors = new ArrayList<>();
-    for (CompletableFuture<AccountResult> f : futures) {
-      AccountResult r = f.join();
+    for (AccountResult r : results) {
       rows.addAll(r.rows);
       if (r.error != null) errors.add(r.error);
     }
@@ -263,22 +277,24 @@ public class NaverAdsService {
     }
   }
 
+  /**
+   * 한 계정의 전체 광고그룹 — 캠페인별 {@code listAdGroups} 호출을 ioExecutor 에서 동시에 수행한다.
+   * (이전엔 캠페인 수만큼 직렬 호출이라 by-category 의 가장 큰 병목이었다.)
+   */
   private List<Map<String, Object>> fetchAccountAdGroups(NaverAccount acc) {
     List<Map<String, Object>> campaigns = client.listCampaigns(acc);
-    List<Map<String, Object>> all = new ArrayList<>();
-    for (Map<String, Object> camp : campaigns) {
+    return inParallel(campaigns, camp -> {
       Object id = camp.get("nccCampaignId");
-      if (id == null) continue;
+      if (id == null) return List.<Map<String, Object>>of();
       try {
-        all.addAll(client.listAdGroups(acc, id.toString()));
+        return client.listAdGroups(acc, id.toString());
       } catch (NaverAdsClient.NaverAdsApiException e) {
         Map<String, Object> err = new HashMap<>();
         err.put("nccCampaignId", id);
         err.put("error", e.getResponseBody());
-        all.add(err);
+        return List.<Map<String, Object>>of(err);
       }
-    }
-    return all;
+    }).stream().flatMap(List::stream).collect(Collectors.toList());
   }
 
   private List<Map<String, Object>> fetchCampaignStats(NaverAccount acc, DateSpec spec) {
