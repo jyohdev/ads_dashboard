@@ -770,15 +770,13 @@
 
   // ──────────────────── 오프라인 광고 ────────────────────
   /** 오프라인 시트 서비스값(주간보호/통합요양/공통)을 대시보드 서비스 탭에 매핑.
-   *  공통은 항상 포함 (특정 서비스에 귀속 안 되는 공용 비용). */
+   *  - 주간보호 탭 → 시트 서비스=주간보호 행만
+   *  - 방문요양 탭 → 시트 서비스=통합요양 행만
+   *  - 전체·본사·가족요양·요양보호사·장기요양등급 → 전부(all) */
   function offlineServiceMatch(rowSvc) {
-    if (state.service === 'all') return true;
-    if (!rowSvc) return false;
-    if (rowSvc === '공통') return true;
     if (state.service === '주간보호') return rowSvc === '주간보호';
     if (state.service === '방문요양') return rowSvc === '통합요양';
-    // 본사·가족요양·요양보호사·장기요양등급 — 시트에 대응 서비스 없음 → 공통만 (위에서 처리)
-    return false;
+    return true;
   }
 
   function renderOffline() {
